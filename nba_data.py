@@ -2,11 +2,12 @@ from fastapi import APIRouter
 import requests
 from datetime import datetime, timezone
 import math
+import re
+import os
 
 # -------------------------
 # TEAM NAME → ABBREVIATION
 # -------------------------
-import re
 
 TEAM_ABBR_MAP = {
     "atlanta hawks": "ATL",
@@ -75,6 +76,7 @@ TEAM_ALIASES = {
     "wizards": "washington wizards",
 }
 
+
 def normalize_team_name(name: str) -> str | None:
     if not name:
         return None
@@ -104,9 +106,6 @@ def team_name_to_abbr(name: str) -> str | None:
         return None
     return TEAM_ABBR_MAP.get(canonical)
 
-
-import requests
-import os
 
 def fetch_nba_totals_odds():
     """
@@ -166,7 +165,6 @@ def fetch_nba_totals_odds():
                     )
                     continue
 
-
                 markets[market["key"]] = {
                     "line": outcomes[0].get("point"),
                     "over_odds": outcomes[0].get("price"),
@@ -181,6 +179,7 @@ def fetch_nba_totals_odds():
 router = APIRouter(prefix="/auto/nba", tags=["NBA Auto"])
 
 NBA_TIMEZONE = timezone.utc
+
 
 def get_nba_game_time(team_a: str, team_b: str, date_str: str):
     url = f"https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_{date_str}.json"
@@ -213,6 +212,7 @@ def get_nba_game_time(team_a: str, team_b: str, date_str: str):
 SCOREBOARD_URL = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
 INJURY_URL = "https://cdn.nba.com/static/json/liveData/injuries/injuryReport_00.json"
 
+
 # -------------------------
 # TEAM COORDINATES (TRAVEL)
 # -------------------------
@@ -226,18 +226,20 @@ TEAM_COORDS = {
     "DAL": (32.7905, -96.8104),
 }
 
+
 # -------------------------
 # STAR PLAYER MAP
 # -------------------------
 STAR_PLAYERS = {
-    "LAL": ["LeBron James", "Anthony Davis"],
+    "LAL": ["LeBron James", "Luka Doncic"],
     "DEN": ["Nikola Jokic", "Jamal Murray"],
     "BOS": ["Jayson Tatum", "Jaylen Brown"],
     "MIL": ["Giannis Antetokounmpo"],
-    "PHX": ["Kevin Durant", "Devin Booker"],
+    "PHX": ["Devin Booker"],
     "GSW": ["Stephen Curry"],
-    "DAL": ["Luka Doncic"],
+    "HOU": ["Kevin Durant"]
 }
+
 
 # -------------------------
 # HELPERS
@@ -253,6 +255,7 @@ def haversine_km(lat1, lon1, lat2, lon2):
         * math.sin(dlon / 2) ** 2
     )
     return R * 2 * math.asin(math.sqrt(a))
+
 
 def get_injury_context():
     try:
@@ -275,11 +278,18 @@ def get_injury_context():
         secondary_out = False
         minutes_factor = 1.0
 
+        questionable = False
+        doubtful = False
+
         for p in players:
             name = p.get("playerName", "")
             status = p.get("status", "").upper()
 
-            if status in ("OUT", "DOUBTFUL"):
+            if status == "QUESTIONABLE":
+                questionable = True
+            elif status == "DOUBTFUL":
+                doubtful = True
+            elif status == "OUT":
                 if name in STAR_PLAYERS.get(abbr, []):
                     star_out = True
                     minutes_factor -= 0.08
@@ -287,20 +297,26 @@ def get_injury_context():
                     secondary_out = True
                     minutes_factor -= 0.03
 
+
         out[abbr] = {
             "star_out": star_out,
             "secondary_out": secondary_out,
+            "questionable": questionable,
+            "doubtful": doubtful,
             "minutes_factor": round(max(minutes_factor, 0.85), 2),
-        }
+}
 
     return out
 
 
 def lineups_confirmed_for_game(home_abbr: str, away_abbr: str) -> bool:
     """
-    Returns True if no QUESTIONABLE or OUT players remain for either team.
-    Conservative: if data missing, returns False.
+    Lineups are considered confirmed ONLY when:
+    - No players are QUESTIONABLE
+    - No players are DOUBTFUL
+    OUT players are allowed (stars can be out)
     """
+
     injury_map = get_injury_context()
 
     for team in (home_abbr, away_abbr):
@@ -308,11 +324,13 @@ def lineups_confirmed_for_game(home_abbr: str, away_abbr: str) -> bool:
         if not team_data:
             return False
 
-        # If star or secondary still out, we treat as not confirmed
-        if team_data.get("star_out") or team_data.get("secondary_out"):
+        # Only block if still uncertain
+        if team_data.get("questionable") or team_data.get("doubtful"):
             return False
 
     return True
+
+
 
 def lineups_confirmed(game_time_utc: datetime, injury_map: dict, home: str, away: str) -> bool:
     """
@@ -352,17 +370,13 @@ def build_model_inputs():
 
     games = data.get("scoreboard", {}).get("games", [])
 
-
-
     injury_map = get_injury_context()
     inputs = []
-
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
 
     for g in games:
         home = g["homeTeam"]["teamTricode"]
         away = g["awayTeam"]["teamTricode"]
-        
+
         tip = g.get("gameTimeUTC")
         if not tip:
             continue
@@ -370,8 +384,6 @@ def build_model_inputs():
         game_time = datetime.fromisoformat(
             tip.replace("Z", "+00:00")
         ).astimezone(NBA_TIMEZONE)
-
-      
 
         travel_km = 0
         if home in TEAM_COORDS and away in TEAM_COORDS:
@@ -387,34 +399,37 @@ def build_model_inputs():
             injury_map=injury_map,
             home=home,
             away=away,
-)
+        )
 
-        inputs.append({
-            "team_a": g["homeTeam"]["teamName"],
-            "team_b": g["awayTeam"]["teamName"],
-            "game_time": game_time,
-            "lineups_confirmed": lineups_ok,
-
-
-            "home_team": "A",
-
-            "team_a_travel_km": 0,
-            "team_b_travel_km": round(travel_km, 1),
-
-            "team_a_star_out": injury_map.get(home, {}).get("star_out", False),
-            "team_b_star_out": injury_map.get(away, {}).get("star_out", False),
-
-            "team_a_secondary_out": injury_map.get(home, {}).get("secondary_out", False),
-            "team_b_secondary_out": injury_map.get(away, {}).get("secondary_out", False),
-
-            "team_a_minutes_factor": injury_map.get(home, {}).get("minutes_factor", 1.0),
-            "team_b_minutes_factor": injury_map.get(away, {}).get("minutes_factor", 1.0),
-
-            "meta": {
-                "game_id": g["gameId"],
-                "start_time_utc": g["gameTimeUTC"],
+        inputs.append(
+            {
+                "team_a": g["homeTeam"]["teamName"],
+                "team_b": g["awayTeam"]["teamName"],
+                "game_time": game_time,
+                "lineups_confirmed": lineups_ok,
+                "home_team": "A",
+                "team_a_travel_km": 0,
+                "team_b_travel_km": round(travel_km, 1),
+                "team_a_star_out": injury_map.get(home, {}).get("star_out", False),
+                "team_b_star_out": injury_map.get(away, {}).get("star_out", False),
+                "team_a_secondary_out": injury_map.get(home, {}).get(
+                    "secondary_out", False
+                ),
+                "team_b_secondary_out": injury_map.get(away, {}).get(
+                    "secondary_out", False
+                ),
+                "team_a_minutes_factor": injury_map.get(home, {}).get(
+                    "minutes_factor", 1.0
+                ),
+                "team_b_minutes_factor": injury_map.get(away, {}).get(
+                    "minutes_factor", 1.0
+                ),
+                "meta": {
+                    "game_id": g["gameId"],
+                    "start_time_utc": g["gameTimeUTC"],
+                },
             }
-        })
+        )
 
     return inputs
 

@@ -224,6 +224,9 @@ def run_simulation(req: SimulationRequest):
         }
 
         key = f"{game_id}_{market}_{tier}"
+        
+        confirmed = lineups_confirmed_for_game(home_abbr, away_abbr)
+        bet_stage = "CONFIRMED" if confirmed else "EARLY"
 
         if signal == "BET" and tier in ("ELITE", "VERY STRONG", "STRONG"):
             if key in SENT_ALERTS:
@@ -232,27 +235,30 @@ def run_simulation(req: SimulationRequest):
 
             SENT_ALERTS.add(key)
 
-            msg = (
-                f"🔥 {market.upper()} TOTAL BET 🔥\n\n"
+            message = (
+                f"{'🔥' if confirmed else '📢'} {bet_stage} TOTAL BET\n\n"
                 f"{req.team_a} vs {req.team_b}\n"
                 f"Line: {market_line}\n"
                 f"Fair: {round(fair, 2)}\n"
                 f"Edge: {round(edge * 100, 2)}%\n"
                 f"Tier: {tier}\n"
-                f"Percentile: {pct}%"
+                f"Percentile: {pct}%\n"
+                f"Injuries Included: YES\n"
             )
 
-            if cfg["early_alert"]:
-                send_telegram_alert(msg)
+
+            if not confirmed:
+                send_telegram_alert(message)  # EARLY alert immediately
             else:
                 PREGAME_ALERTS[key] = {
                     "game_time": req.game_time,
-                    "message": msg,
+                    "message": message,
                     "home_abbr": home_abbr,
                     "away_abbr": away_abbr,
                     "sent_10": False,
                     "sent_2": False,
                 }
+
         else:
             print(
                 f"SKIP {game_id} | {market} "
