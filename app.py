@@ -270,6 +270,15 @@ def run_simulation(req: SimulationRequest):
             "q4": "⏱️ Q4 TOTAL",
         }.get(market, market.upper())
 
+        
+        # -------------------------
+        # BET STAGE
+        # -------------------------
+
+        confirmed = lineups_confirmed_for_game(home_abbr, away_abbr)
+        bet_stage = "CONFIRMED" if confirmed else "EARLY"
+        stage_emoji = "🔥" if confirmed else "📢"
+
         # -------------------------
         # DEDUPLICATION KEY
         # -------------------------
@@ -281,15 +290,7 @@ def run_simulation(req: SimulationRequest):
             continue
 
         SENT_ALERTS.add(key)
-
-        # -------------------------
-        # BET STAGE
-        # -------------------------
-
-        confirmed = lineups_confirmed_for_game(home_abbr, away_abbr)
-        bet_stage = "CONFIRMED" if confirmed else "EARLY"
-        stage_emoji = "🔥" if confirmed else "📢"
-
+        
         # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
