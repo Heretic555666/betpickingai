@@ -306,21 +306,19 @@ def run_simulation(req: SimulationRequest):
             f"🏥 Injuries Included: YES\n"
         )
 
-        # -------------------------
+                # -------------------------
         # SEND / QUEUE ALERT
         # -------------------------
 
-        if not confirmed:
-            send_telegram_alert(message)
-        else:
-            PREGAME_ALERTS[key] = {
-                "game_time": req.game_time,
-                "message": message,
-                "home_abbr": home_abbr,
-                "away_abbr": away_abbr,
-                "sent_10": False,
-                "sent_2": False,
-            }
+        # ❌ EARLY alerts disabled to reduce usage
+        PREGAME_ALERTS[key] = {
+            "game_time": req.game_time,
+            "message": message,
+            "home_abbr": home_abbr,
+            "away_abbr": away_abbr,
+            "sent_10": False,
+            "sent_2": False,
+        }
 
     return {"game": game_id, "markets": results}
 
