@@ -8,12 +8,14 @@ import os
 import anyio
 
 from dotenv import load_dotenv
+
 from nba_data import (
     fetch_nba_totals_odds,
     build_model_inputs,
     team_name_to_abbr,
     router as nba_router,
-    lineups_confirmed_for_game,
+    lineups_confirmed,
+    get_injury_context,
 )
 
 load_dotenv()
@@ -275,10 +277,17 @@ def run_simulation(req: SimulationRequest):
         # BET STAGE
         # -------------------------
 
-        confirmed = lineups_confirmed_for_game(home_abbr, away_abbr)
+        confirmed = lineups_confirmed(
+            game_time_utc=req.game_time,
+            injury_map=get_injury_context(),
+            home=home_abbr,
+            away=away_abbr,
+        )
+
         bet_stage = "CONFIRMED" if confirmed else "EARLY"
         stage_emoji = "🔥" if confirmed else "📢"
-
+      
+        
         # -------------------------
         # DEDUPLICATION KEY
         # -------------------------
@@ -290,7 +299,7 @@ def run_simulation(req: SimulationRequest):
             continue
 
         SENT_ALERTS.add(key)
-        
+
         # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
@@ -312,14 +321,16 @@ def run_simulation(req: SimulationRequest):
         # -------------------------
 
         # ❌ EARLY alerts disabled to reduce usage
-        PREGAME_ALERTS[key] = {
-            "game_time": req.game_time,
-            "message": message,
-            "home_abbr": home_abbr,
-            "away_abbr": away_abbr,
-            "sent_10": False,
-            "sent_2": False,
-        }
+        if key not in PREGAME_ALERTS:
+            PREGAME_ALERTS[key] = {
+                "game_time": req.game_time,
+                "message": message,
+                "home_abbr": home_abbr,
+                "away_abbr": away_abbr,
+                "sent_10": False,
+                "sent_2": False,
+            }
+
 
     return {"game": game_id, "markets": results}
 
@@ -347,9 +358,15 @@ async def pregame_alert_scheduler():
 
             # 🔔 10-minute alert
             if not alert.get("sent_10") and now >= game_time - timedelta(minutes=10):
-                confirmed = lineups_confirmed_for_game(
-                    alert["home_abbr"], alert["away_abbr"]
-                )
+                confirmed = lineups_confirmed(
+                    game_time_utc=alert["game_time"],
+                    injury_map=get_injury_context(),
+                    home=alert["home_abbr"],
+                    away=alert["away_abbr"],
+            )
+
+                    
+                
                 prefix = "⏰ 10 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "⏰ 10 MIN")
@@ -358,9 +375,13 @@ async def pregame_alert_scheduler():
 
             # 🚨 2-minute alert
             if not alert.get("sent_2") and now >= game_time - timedelta(minutes=2):
-                confirmed = lineups_confirmed_for_game(
-                    alert["home_abbr"], alert["away_abbr"]
-                )
+                confirmed = lineups_confirmed(
+                    game_time_utc=alert["game_time"],
+                    injury_map=get_injury_context(),
+                    home=alert["home_abbr"],
+                    away=alert["away_abbr"],
+            )
+
                 prefix = "🚨 2 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "🚨 2 MIN")

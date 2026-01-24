@@ -6,6 +6,12 @@ import re
 import os
 
 # -------------------------
+# NAME NORMALIZATION
+# -------------------------
+def canon(name: str) -> str:
+    return name.lower().replace(".", "").strip()
+
+# -------------------------
 # TEAM NAME → ABBREVIATION
 # -------------------------
 
@@ -210,30 +216,91 @@ INJURY_URL = "https://cdn.nba.com/static/json/liveData/injuries/injuryReport_00.
 # -------------------------
 # TEAM COORDINATES (TRAVEL)
 # -------------------------
+# Coordinates = arena locations (lat, lon)
+
 TEAM_COORDS = {
-    "LAL": (34.0430, -118.2673),
-    "GSW": (37.7680, -122.3877),
-    "PHX": (33.4457, -112.0712),
-    "DEN": (39.7487, -105.0077),
-    "BOS": (42.3662, -71.0621),
-    "MIL": (43.0451, -87.9180),
-    "DAL": (32.7905, -96.8104),
+    "ATL": (33.7573, -84.3963),   # Hawks – State Farm Arena
+    "BOS": (42.3662, -71.0621),   # Celtics – TD Garden
+    "BKN": (40.6826, -73.9754),   # Nets – Barclays Center
+    "CHA": (35.2251, -80.8392),   # Hornets – Spectrum Center
+    "CHI": (41.8807, -87.6742),   # Bulls – United Center
+    "CLE": (41.4965, -81.6882),   # Cavaliers – Rocket Mortgage FieldHouse
+    "DAL": (32.7905, -96.8104),   # Mavericks – American Airlines Center
+    "DEN": (39.7487, -105.0077),  # Nuggets – Ball Arena (ALTITUDE)
+    "DET": (42.3411, -83.0553),   # Pistons – Little Caesars Arena
+    "GSW": (37.7680, -122.3877),  # Warriors – Chase Center
+    "HOU": (29.7508, -95.3621),   # Rockets – Toyota Center
+    "IND": (39.7639, -86.1555),   # Pacers – Gainbridge Fieldhouse
+    "LAC": (34.0430, -118.2673),  # Clippers – Crypto.com Arena
+    "LAL": (34.0430, -118.2673),  # Lakers – Crypto.com Arena
+    "MEM": (35.1382, -90.0506),   # Grizzlies – FedExForum
+    "MIA": (25.7814, -80.1870),   # Heat – Kaseya Center
+    "MIL": (43.0451, -87.9180),   # Bucks – Fiserv Forum
+    "MIN": (44.9795, -93.2760),   # Timberwolves – Target Center
+    "NOP": (29.9489, -90.0819),   # Pelicans – Smoothie King Center
+    "NYK": (40.7505, -73.9934),   # Knicks – Madison Square Garden
+    "OKC": (35.4634, -97.5151),   # Thunder – Paycom Center
+    "ORL": (28.5392, -81.3839),   # Magic – Kia Center
+    "PHI": (39.9012, -75.1720),   # 76ers – Wells Fargo Center
+    "PHX": (33.4457, -112.0712),  # Suns – Footprint Center
+    "POR": (45.5316, -122.6668),  # Trail Blazers – Moda Center
+    "SAC": (38.5802, -121.4997),  # Kings – Golden 1 Center
+    "SAS": (29.4269, -98.4375),   # Spurs – Frost Bank Center
+    "TOR": (43.6435, -79.3791),   # Raptors – Scotiabank Arena
+    "UTA": (40.7683, -111.9011),  # Jazz – Delta Center (ALTITUDE)
+    "WAS": (38.8981, -77.0209),   # Wizards – Capital One Arena
 }
+
 
 
 # -------------------------
 # STAR PLAYER MAP
 # -------------------------
 STAR_PLAYERS = {
-    "LAL": ["LeBron James", "Luka Doncic"],
-    "DEN": ["Nikola Jokic", "Jamal Murray"],
+    # Atlantic
     "BOS": ["Jayson Tatum", "Jaylen Brown"],
-    "MIL": ["Giannis Antetokounmpo"],
-    "PHX": ["Devin Booker"],
-    "GSW": ["Stephen Curry"],
-    "HOU": ["Kevin Durant"]
-}
+    "BKN": ["Cam Thomas", "Michael Porter Jr."],
+    "NYK": ["Jalen Brunson", "Karl-Anthony Towns"],
+    "PHI": ["Joel Embiid", "Tyrese Maxey"],
+    "TOR": ["Scottie Barnes", "Brandon Ingram"],
 
+    # Central
+    "CHI": ["Zach LaVine", "Nikola Vucevic"],
+    "CLE": ["Donovan Mitchell", "Darius Garland"],
+    "DET": ["Cade Cunningham"],
+    "IND": ["Tyrese Haliburton", "Pascal Siakam"],
+    "MIL": ["Giannis Antetokounmpo"],
+
+    # Southeast
+    "ATL": ["CJ McCollum", "Kristaps Porzingis"],
+    "CHA": ["LaMelo Ball", "Brandon Miller"],
+    "MIA": ["Bam Adebayo", "Tyler Herro", "Norman Powell"],
+    "ORL": ["Paolo Banchero", "Franz Wagner"],
+    "WAS": ["Trae Young", "Jordan Poole"],
+
+    # Northwest
+    "DEN": ["Nikola Jokic", "Jamal Murray"],
+    "MIN": ["Anthony Edwards"],
+    "OKC": ["Shai Gilgeous-Alexander"],
+    "POR": ["Damian Lillard"],
+    "UTA": ["Lauri Markkanen"],
+
+    # Pacific
+    "GSW": ["Stephen Curry", "Jimmy Butler III"],
+    "LAC": ["Kawhi Leonard", "James Harden"],
+    "LAL": ["LeBron James", "Luka Doncic"],
+    "PHX": ["Devin Booker", "Jalen Green"],
+    "SAC": ["Domantas Sabonis", "DeMar DeRozan"],
+
+    # Southwest
+    "DAL": ["Anthony Davis"],
+    "HOU": ["Kevin Durant", "Alperen Sengun"],
+    "MEM": ["Ja Morant", "Jaren Jackson Jr."],
+    "NOP": ["Zion Williamson", "Dejounte Murray"],
+    "SAS": ["Victor Wembanyama"]
+}
+all_stars = [p for team in STAR_PLAYERS.values() for p in team]
+assert len(all_stars) == len(set(all_stars)), "Duplicate star across teams!"
 
 # -------------------------
 # HELPERS
@@ -276,20 +343,21 @@ def get_injury_context():
         doubtful = False
 
         for p in players:
-            name = p.get("playerName", "")
+            name = canon(p.get("playerName", ""))
             status = p.get("status", "").upper()
+
 
             if status == "QUESTIONABLE":
                 questionable = True
-            elif status == "DOUBTFUL":
-                doubtful = True
             elif status == "OUT":
-                if name in STAR_PLAYERS.get(abbr, []):
-                    star_out = True
-                    minutes_factor -= 0.08
-                else:
-                    secondary_out = True
-                    minutes_factor -= 0.03
+                team_stars = [canon(p) for p in STAR_PLAYERS.get(abbr, [])]
+
+            if name in team_stars:
+                star_out = True
+                minutes_factor -= 0.08
+            else:
+                secondary_out = True
+                minutes_factor -= 0.03
 
 
         out[abbr] = {
@@ -439,3 +507,6 @@ def nba_today_debug():
         "games_found": len(games),
         "games": games,
     }
+
+# --- BACKWARD COMPATIBILITY ALIAS ---
+lineups_confirmed_for_game = lineups_confirmed
