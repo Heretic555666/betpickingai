@@ -112,14 +112,12 @@ def fetch_nba_totals_odds():
     Fetches game + quarter totals from The Odds API.
     Returns dict keyed by (home_abbr, away_abbr).
     """
-
     ODDS_API_BASE = "https://api.the-odds-api.com/v4/sports/basketball_nba/odds"
     ODDS_API_KEY = os.getenv("ODDS_API_KEY")
-
+    
     if not ODDS_API_KEY:
         print("❌ ODDS_API_KEY missing")
         return {}
-
     params = {
         "apiKey": ODDS_API_KEY,
         "regions": "us",
@@ -129,32 +127,29 @@ def fetch_nba_totals_odds():
 
     try:
         res = requests.get(ODDS_API_BASE, params=params, timeout=10)
-
         if res.status_code != 200:
             print("❌ Odds API bad status:", res.status_code)
+            try:
+                print("Response body:", res.json())
+            except ValueError:
+                print("Response text:", res.text)
             return {}
-
         if not res.text or not res.text.strip():
             print("⚠️ Odds API returned empty response (no odds live yet)")
             return {}
-
         games = res.json()
-
     except Exception as e:
         print("❌ Odds API error:", e)
         return {}
 
     odds_map = {}
-
     for game in games:
         home_abbr = team_name_to_abbr(game["home_team"])
         away_abbr = team_name_to_abbr(game["away_team"])
-
         if not home_abbr or not away_abbr:
             continue
 
         markets = {}
-
         for bookmaker in game.get("bookmakers", []):
             for market in bookmaker.get("markets", []):
                 outcomes = market.get("outcomes", [])
@@ -164,7 +159,6 @@ def fetch_nba_totals_odds():
                         f"{game['home_team']} vs {game['away_team']}"
                     )
                     continue
-
                 markets[market["key"]] = {
                     "line": outcomes[0].get("point"),
                     "over_odds": outcomes[0].get("price"),
@@ -172,8 +166,8 @@ def fetch_nba_totals_odds():
                 }
 
         odds_map[(home_abbr, away_abbr)] = markets
-
     return odds_map
+
 
 
 router = APIRouter(prefix="/auto/nba", tags=["NBA Auto"])

@@ -5,25 +5,34 @@ ODDS_API_KEY = os.getenv("ODDS_API_KEY")
 
 SPORT_KEY = "basketball_nba"
 REGIONS = "us"
-MARKETS = "totals,totals_q1,totals_q2,totals_q3,totals_q4"
+MARKETS = "spreads,totals"
 ODDS_FORMAT = "decimal"
+
 
 def fetch_nba_totals():
     url = f"https://api.the-odds-api.com/v4/sports/{SPORT_KEY}/odds"
 
     params = {
         "apiKey": ODDS_API_KEY,
-        "regions": "us",
-        "markets": "totals",
-        "oddsFormat": "decimal",
+        "regions": REGIONS,
+        "markets": MARKETS,
+        "oddsFormat": ODDS_FORMAT,
     }
-
 
     res = requests.get(url, params=params, timeout=10)
     res.raise_for_status()
 
     try:
-        return res.json()
-    except ValueError:
-        return None
+        data = res.json()
+        
+        # 🔍 DEBUG — DO NOT DELETE ANYTHING ELSE
+        print("ODDS RAW RESPONSE (first 3000 chars):")
+        print(str(data)[:3000])
 
+        if "message" in data:
+            print(f"API error: {data['message']}")
+            return None
+        return data
+    except ValueError:
+        print("Invalid JSON response")
+        return None

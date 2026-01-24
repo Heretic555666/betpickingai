@@ -16,6 +16,8 @@ from nba_data import (
     lineups_confirmed_for_game,
 )
 
+load_dotenv()
+
 # =========================================================
 # ENV / APP SETUP
 # =========================================================
@@ -89,14 +91,6 @@ MARKET_CONFIG = {
     "q4":   {"mean_factor": 0.25, "sd": 6,  "early_alert": False},
 }
 
-MARKET_KEY_MAP = {
-    "game": "game",
-    "q1": "q1",
-    "q2": "q2",
-    "q3": "q3",
-    "q4": "q4",
-}
-
 # =========================================================
 # INPUT MODEL
 # =========================================================
@@ -149,9 +143,9 @@ def confidence_tier(score):
         return "ELITE"
     if score >= 71:
         return "VERY STRONG"
-    if score >= 51:
+    if score >= 60:
         return "STRONG"
-    if score >= 31:
+    if score >= 41:
         return "LEAN"
     return "NOISE"
 
@@ -165,6 +159,7 @@ def run_simulation(req: SimulationRequest):
     reset_alerts_if_new_day()
 
     odds_map = fetch_nba_totals_odds()
+    print(f"ODDS MAP GAMES: {list(odds_map.keys())}")
 
     home_abbr = team_name_to_abbr(req.team_a)
     away_abbr = team_name_to_abbr(req.team_b)
@@ -180,8 +175,28 @@ def run_simulation(req: SimulationRequest):
     )
 
     if not matchup_odds:
-        print(f"❌ No odds for {game_id}")
+        print(f"SKIP {game_id} | no markets posted yet")
+        return {"game": game_id, "markets": {}}
+
+
+    has_core_market = any(
+        k in matchup_odds
+        for k in (
+            "totals",
+            "spreads",
+            "totals_q1",
+            "totals_q2",
+            "totals_q3",
+            "totals_q4",
+            "totals_h1",
+
+        )    
+    )
+
+    if not has_core_market:
+        print(f"❌ No usable markets for {game_id}")
         return None
+
 
     adj_a = req.base_team_a_points
     adj_b = req.base_team_b_points
@@ -193,14 +208,26 @@ def run_simulation(req: SimulationRequest):
     results = {}
 
     for market, cfg in MARKET_CONFIG.items():
-        api_market = MARKET_KEY_MAP[market]
-        odds = matchup_odds.get(api_market)
+
+        if market == "game":
+            odds = matchup_odds.get("totals")
+        elif market == "q1":
+            odds = matchup_odds.get("totals_q1")
+        elif market == "q2":
+            odds = matchup_odds.get("totals_q2")
+        elif market == "q3":
+            odds = matchup_odds.get("totals_q3")
+        elif market == "q4":
+            odds = matchup_odds.get("totals_q4")
+        else:
+            odds = None
+
         if not odds:
-            print(f"SKIP {game_id} | {market} not posted")
+            print(f"SKIP {game_id} | {market} not available")
             continue
 
         market_line = odds["line"]
-        market_odds = odds["odds"]
+        market_odds = odds["over_odds"]
 
         mean = (adj_a + adj_b) * cfg["mean_factor"]
         totals = rng.normal(mean, cfg["sd"], SIMULATIONS)
@@ -208,8 +235,16 @@ def run_simulation(req: SimulationRequest):
         fair = float(np.mean(totals))
         raw_over = float(np.mean(totals > market_line))
         cal_over = calibrate_prob(raw_over)
+
+        over_prob = cal_over
+        under_prob = 1 - cal_over
+
+        bet_side = "OVER" if over_prob > under_prob else "UNDER"
+        side_emoji = "⬆️" if bet_side == "OVER" else "⬇️"
+
         edge = cap_edge(cal_over - implied_prob(market_odds))
         pct = percentile_position(totals, market_line)
+
 
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
@@ -223,47 +258,69 @@ def run_simulation(req: SimulationRequest):
             "signal": signal,
         }
 
-        key = f"{game_id}_{market}_{tier}"
-        
+        # -------------------------
+        # MARKET LABEL + EMOJI
+        # -------------------------
+
+        market_label = {
+            "game": "🏀 FULL GAME TOTAL",
+            "q1": "⏱️ Q1 TOTAL",
+            "q2": "⏱️ Q2 TOTAL",
+            "q3": "⏱️ Q3 TOTAL",
+            "q4": "⏱️ Q4 TOTAL",
+        }.get(market, market.upper())
+
+        # -------------------------
+        # DEDUPLICATION KEY
+        # -------------------------
+
+        key = f"{game_id}_{market}_{market_line}_{bet_stage}"
+
+        if key in SENT_ALERTS:
+            print("DEDUPED:", key)
+            continue
+
+        SENT_ALERTS.add(key)
+
+        # -------------------------
+        # BET STAGE
+        # -------------------------
+
         confirmed = lineups_confirmed_for_game(home_abbr, away_abbr)
         bet_stage = "CONFIRMED" if confirmed else "EARLY"
+        stage_emoji = "🔥" if confirmed else "📢"
 
-        if signal == "BET" and tier in ("ELITE", "VERY STRONG", "STRONG"):
-            if key in SENT_ALERTS:
-                print("DEDUPED:", key)
-                continue
+        # -------------------------
+        # TELEGRAM MESSAGE
+        # -------------------------
 
-            SENT_ALERTS.add(key)
+        message = (
+            f"{stage_emoji} {bet_stage} {market_label}\n"
+            f"{side_emoji} PICK: {bet_side}\n\n"
+            f"{req.team_a} vs {req.team_b}\n"
+            f"📈 Line: {market_line}\n"
+            f"🎯 Fair: {round(fair, 2)}\n"
+            f"⚡ Edge: {round(edge * 100, 2)}%\n"
+            f"🏆 Tier: {tier}\n"
+            f"📊 Percentile: {pct}%\n"
+            f"🏥 Injuries Included: YES\n"
+        )
 
-            message = (
-                f"{'🔥' if confirmed else '📢'} {bet_stage} TOTAL BET\n\n"
-                f"{req.team_a} vs {req.team_b}\n"
-                f"Line: {market_line}\n"
-                f"Fair: {round(fair, 2)}\n"
-                f"Edge: {round(edge * 100, 2)}%\n"
-                f"Tier: {tier}\n"
-                f"Percentile: {pct}%\n"
-                f"Injuries Included: YES\n"
-            )
+        # -------------------------
+        # SEND / QUEUE ALERT
+        # -------------------------
 
-
-            if not confirmed:
-                send_telegram_alert(message)  # EARLY alert immediately
-            else:
-                PREGAME_ALERTS[key] = {
-                    "game_time": req.game_time,
-                    "message": message,
-                    "home_abbr": home_abbr,
-                    "away_abbr": away_abbr,
-                    "sent_10": False,
-                    "sent_2": False,
-                }
-
+        if not confirmed:
+            send_telegram_alert(message)
         else:
-            print(
-                f"SKIP {game_id} | {market} "
-                f"edge={edge:.3f} pct={pct} tier={tier} signal={signal}"
-            )
+            PREGAME_ALERTS[key] = {
+                "game_time": req.game_time,
+                "message": message,
+                "home_abbr": home_abbr,
+                "away_abbr": away_abbr,
+                "sent_10": False,
+                "sent_2": False,
+            }
 
     return {"game": game_id, "markets": results}
 
@@ -294,9 +351,10 @@ async def pregame_alert_scheduler():
                 confirmed = lineups_confirmed_for_game(
                     alert["home_abbr"], alert["away_abbr"]
                 )
-                prefix = "⏰ 10 MIN ALERT\n"
+                prefix = "⏰ 10 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
-                send_telegram_alert(prefix + alert["message"])
+                msg = alert["message"].replace("📢 EARLY", "⏰ 10 MIN")
+                send_telegram_alert(prefix + msg)
                 alert["sent_10"] = True
 
             # 🚨 2-minute alert
@@ -304,9 +362,10 @@ async def pregame_alert_scheduler():
                 confirmed = lineups_confirmed_for_game(
                     alert["home_abbr"], alert["away_abbr"]
                 )
-                prefix = "🚨 2 MIN ALERT\n"
+                prefix = "🚨 2 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
-                send_telegram_alert(prefix + alert["message"])
+                msg = alert["message"].replace("📢 EARLY", "🚨 2 MIN")
+                send_telegram_alert(prefix + msg)
                 alert["sent_2"] = True
 
         await asyncio.sleep(60)
