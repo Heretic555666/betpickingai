@@ -106,6 +106,13 @@ class SimulationRequest(BaseModel):
     base_team_b_points: float = 112
     home_team: str = "A"
 
+    # travel & fatigue (safe defaults)
+    team_a_travel_km: float = 0
+    team_b_travel_km: float = 0
+    team_a_b2b: bool = False
+    team_b_b2b: bool = False
+
+
 # =========================================================
 # MATH HELPERS
 # =========================================================
@@ -232,6 +239,23 @@ def run_simulation(req: SimulationRequest):
     ):
         adj_b -= 0.5
 
+    # -------------------------
+    # PURE TRAVEL FATIGUE (AWAY)
+    # -------------------------
+    if getattr(req, "team_b_travel_km", 0) > 1500:
+        adj_b -= 0.75
+    elif getattr(req, "team_b_travel_km", 0) > 800:
+        adj_b -= 0.4
+
+    # -------------------------
+    # ALTITUDE EDGE (HOME ONLY)
+    # -------------------------
+    HIGH_ALTITUDE = {"DEN", "UTA"}
+
+    if home_abbr in HIGH_ALTITUDE:
+        adj_a += 0.6
+        adj_b -= 0.4
+
     results = {}
 
     for market, cfg in MARKET_CONFIG.items():
@@ -345,6 +369,7 @@ def run_simulation(req: SimulationRequest):
             f"{side_emoji} PICK: {bet_side}\n\n"
             f"{req.team_a} vs {req.team_b}\n"
             f"{b2b_label}"
+            f"✈️ Away Travel: {round(req.team_b_travel_km)} km\n"
             f"📈 Line: {market_line}\n"
             f"🎯 Fair: {round(fair, 2)}\n"
             f"⚡ Edge: {round(edge * 100, 2)}%\n"
@@ -461,7 +486,13 @@ async def daily_auto_run():
                         team_b=g["team_b"],
                         game_time=g["game_time"],
                         home_team=g.get("home_team", "A"),
-                    )
+
+                        team_a_travel_km=g.get("team_a_travel_km", 0),
+                        team_b_travel_km=g.get("team_b_travel_km", 0),
+                        team_a_b2b=g.get("team_a_b2b", False),
+                        team_b_b2b=g.get("team_b_b2b", False),
+                )
+
                     result = await anyio.to_thread.run_sync(run_simulation, req)
                     print("✅ Auto-run game complete:", result)
 
