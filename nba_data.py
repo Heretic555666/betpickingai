@@ -407,10 +407,15 @@ def lineups_confirmed(game_time_utc: datetime, injury_map: dict, home: str, away
     if (game_time_utc - now_utc).total_seconds() > 1800:
         return False  # too early
 
-    home_star_out = injury_map.get(home, {}).get("star_out", False)
-    away_star_out = injury_map.get(away, {}).get("star_out", False)
+    team_uncertain = (
+        injury_map.get(home, {}).get("questionable", False)
+        or injury_map.get(home, {}).get("doubtful", False)
+        or injury_map.get(away, {}).get("questionable", False)
+        or injury_map.get(away, {}).get("doubtful", False)
+    )
 
-    return not (home_star_out or away_star_out)
+    return not team_uncertain
+
 
 def is_back_to_back(team_abbr: str, game_time: datetime, games: list) -> bool:
     """
