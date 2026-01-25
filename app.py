@@ -57,10 +57,30 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 
-def send_telegram_alert(message: str):
+def send_telegram_alert(
+    message: str,
+    pace_adjust: float | None = None,
+    variance_adjust: float | None = None,
+):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⚠ Telegram not configured")
         return
+
+    # ----------------------------------
+    # FAST / SLOW TAG LOGIC (HERE)
+    # ----------------------------------
+    if pace_adjust is not None:
+        if pace_adjust >= 1.0:
+            message += "\n🔥 FAST game environment"
+        elif pace_adjust <= -1.0:
+            message += "\n🐢 SLOW game environment"
+
+    # Optional numeric debug (keep or remove later)
+    if pace_adjust is not None or variance_adjust is not None:
+        message += (
+            f"\n\n⚙ Pace adj: {pace_adjust:+.2f}"
+            f" | Var adj: {variance_adjust:+.2f}"
+        )
 
     try:
         res = requests.post(
@@ -75,6 +95,8 @@ def send_telegram_alert(message: str):
         print("✅ Telegram sent:", res.status_code)
     except Exception as e:
         print("❌ Telegram failed:", e)
+
+
 
 
 # =========================================================
@@ -354,6 +376,8 @@ def run_simulation(req: SimulationRequest):
             "pct": pct,
             "tier": tier,
             "signal": signal,
+            "pace_adjust": round(pace_adjust, 2),
+            "variance_adjust": round(variance_adjust, 2),
         }
 
         # -------------------------
@@ -479,7 +503,11 @@ async def pregame_alert_scheduler():
                 prefix = "⏰ 10 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "⏰ 10 MIN")
-                send_telegram_alert(prefix + msg)
+                send_telegram_alert(
+                    prefix + msg,
+                    pace_adjust=results["game"]["pace_adjust"],
+                    variance_adjust=results["game"]["variance_adjust"],
+                )
                 alert["sent_10"] = True
 
             # 🚨 2-minute alert
@@ -494,7 +522,11 @@ async def pregame_alert_scheduler():
                 prefix = "🚨 2 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "🚨 2 MIN")
-                send_telegram_alert(prefix + msg)
+                send_telegram_alert(
+                    prefix + msg,
+                    pace_adjust=results["game"]["pace_adjust"],
+                    variance_adjust=results["game"]["variance_adjust"],
+                )
                 alert["sent_2"] = True
 
         await asyncio.sleep(60)
