@@ -518,3 +518,11 @@ async def startup():
 def test_telegram():
     send_telegram_alert("✅ Telegram test successful")
     return {"ok": True}
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "service": "betpicking-ai",
+        "time": datetime.now(timezone.utc).isoformat(),
+    }
