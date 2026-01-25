@@ -202,10 +202,25 @@ def run_simulation(req: SimulationRequest):
 
     adj_a = req.base_team_a_points
     adj_b = req.base_team_b_points
+
+    # -------------------------
+    # HOME COURT
+    # -------------------------
     if req.home_team == "A":
         adj_a += 2.5
     else:
         adj_b += 2.5
+
+    # NOTE: Fatigue applied BEFORE market scaling
+    # -------------------------
+    # BACK-TO-BACK FATIGUE 
+    # -------------------------
+    if getattr(req, "team_a_b2b", False):
+        # home team less impacted, away team more impacted
+        adj_a -= 1.0 if req.home_team == "A" else 2.0
+
+    if getattr(req, "team_b_b2b", False):
+        adj_b -= 1.0 if req.home_team == "B" else 2.0
 
     results = {}
 
@@ -301,6 +316,17 @@ def run_simulation(req: SimulationRequest):
         SENT_ALERTS.add(key)
 
         # -------------------------
+        # CONTEXT TAGS (DISPLAY ONLY)
+        # -------------------------
+        b2b_tags = []
+        if getattr(req, "team_a_b2b", False):
+            b2b_tags.append(f"{req.team_a} B2B")
+        if getattr(req, "team_b_b2b", False):
+            b2b_tags.append(f"{req.team_b} B2B")
+
+        b2b_label = f"🔁 Back-to-Back: {', '.join(b2b_tags)}\n" if b2b_tags else ""
+ 
+        # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
 
@@ -308,6 +334,7 @@ def run_simulation(req: SimulationRequest):
             f"{stage_emoji} {bet_stage} {market_label}\n"
             f"{side_emoji} PICK: {bet_side}\n\n"
             f"{req.team_a} vs {req.team_b}\n"
+            f"{b2b_label}"
             f"📈 Line: {market_line}\n"
             f"🎯 Fair: {round(fair, 2)}\n"
             f"⚡ Edge: {round(edge * 100, 2)}%\n"

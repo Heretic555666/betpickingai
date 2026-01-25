@@ -342,23 +342,22 @@ def get_injury_context():
         questionable = False
         doubtful = False
 
+        
         for p in players:
             name = canon(p.get("playerName", ""))
             status = p.get("status", "").upper()
 
+            team_stars = [canon(p) for p in STAR_PLAYERS.get(abbr, [])]
 
             if status == "QUESTIONABLE":
                 questionable = True
-            elif status == "OUT":
-                team_stars = [canon(p) for p in STAR_PLAYERS.get(abbr, [])]
 
-            if name in team_stars:
+            if name in team_stars and status == "OUT":
                 star_out = True
                 minutes_factor -= 0.08
-            else:
+            elif status == "OUT":
                 secondary_out = True
                 minutes_factor -= 0.03
-
 
         out[abbr] = {
             "star_out": star_out,
@@ -413,6 +412,31 @@ def lineups_confirmed(game_time_utc: datetime, injury_map: dict, home: str, away
 
     return not (home_star_out or away_star_out)
 
+def is_back_to_back(team_abbr: str, game_time: datetime, games: list) -> bool:
+    """
+    Returns True if the team played a game within the last ~24–26 hours.
+    """
+    for g in games:
+        if team_abbr not in (
+            g["homeTeam"]["teamTricode"],
+            g["awayTeam"]["teamTricode"],
+        ):
+            continue
+
+        prev_tip = g.get("gameTimeUTC")
+        if not prev_tip:
+            continue
+
+        prev_time = datetime.fromisoformat(
+            prev_tip.replace("Z", "+00:00")
+        ).astimezone(timezone.utc)
+
+        diff_hours = (game_time - prev_time).total_seconds() / 3600
+        if 0 < diff_hours <= 26:
+            return True
+
+    return False
+
 
 # -------------------------
 # BUILD MODEL INPUTS (CRITICAL)
@@ -463,6 +487,9 @@ def build_model_inputs():
             away=away,
         )
 
+        team_a_b2b = is_back_to_back(home, game_time, games)
+        team_b_b2b = is_back_to_back(away, game_time, games)
+
         inputs.append(
             {
                 "team_a": g["homeTeam"]["teamName"],
@@ -472,6 +499,8 @@ def build_model_inputs():
                 "home_team": "A",
                 "team_a_travel_km": 0,
                 "team_b_travel_km": round(travel_km, 1),
+                "team_a_b2b": team_a_b2b,
+                "team_b_b2b": team_b_b2b,
                 "team_a_star_out": injury_map.get(home, {}).get("star_out", False),
                 "team_b_star_out": injury_map.get(away, {}).get("star_out", False),
                 "team_a_secondary_out": injury_map.get(home, {}).get(
