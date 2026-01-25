@@ -211,6 +211,7 @@ def run_simulation(req: SimulationRequest):
     else:
         adj_b += 2.5
 
+    # NOTE: team_b is always the away team in this model
     # NOTE: Fatigue applied BEFORE market scaling
     # -------------------------
     # BACK-TO-BACK FATIGUE 
@@ -221,6 +222,15 @@ def run_simulation(req: SimulationRequest):
 
     if getattr(req, "team_b_b2b", False):
         adj_b -= 1.0 if req.home_team == "B" else 2.0
+
+    # -------------------------
+    # TRAVEL × B2B STACK (AWAY ONLY)
+    # -------------------------
+    if (
+        getattr(req, "team_b_b2b", False)
+        and getattr(req, "team_b_travel_km", 0) > 800
+    ):
+        adj_b -= 0.5
 
     results = {}
 
