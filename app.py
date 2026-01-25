@@ -34,6 +34,21 @@ DEFAULT_BANKROLL = 1000
 
 AEST = timezone(timedelta(hours=10))
 
+# -------------------------
+# STAR TIER PACE MODIFIERS
+# -------------------------
+
+PACE_MODIFIERS = {
+    "TIER_1_OUT": {
+        "pace": +1.5,      # faster game
+        "variance": +0.8,  # more chaos
+    },
+    "TIER_2_OUT": {
+        "pace": -1.0,      # slower game
+        "variance": +0.2,  # uglier offense
+    },
+}
+
 # =========================================================
 # TELEGRAM
 # =========================================================
@@ -258,6 +273,34 @@ def run_simulation(req: SimulationRequest):
 
     results = {}
 
+    # -------------------------
+    # INJURY CONTEXT (TIER-AWARE)
+    # -------------------------
+
+    injury_map = get_injury_context()
+
+    home_ctx = injury_map.get(home_abbr, {})
+    away_ctx = injury_map.get(away_abbr, {})
+
+    pace_adjust = 0.0
+    variance_adjust = 0.0
+
+    for ctx in (home_ctx, away_ctx):
+        if ctx.get("tier_1_out"):
+            pace_adjust += PACE_MODIFIERS["TIER_1_OUT"]["pace"]
+            variance_adjust += PACE_MODIFIERS["TIER_1_OUT"]["variance"]
+
+        if ctx.get("tier_2_out"):
+            pace_adjust += PACE_MODIFIERS["TIER_2_OUT"]["pace"]
+            variance_adjust += PACE_MODIFIERS["TIER_2_OUT"]["variance"]
+
+    if pace_adjust != 0 or variance_adjust != 0:
+        print(
+            f"[PACE DEBUG] {home_abbr} vs {away_abbr} | "
+            f"pace_adjust={pace_adjust:.2f}, variance_adjust={variance_adjust:.2f} | "
+            f"home_ctx={home_ctx} | away_ctx={away_ctx}"
+        )
+
     for market, cfg in MARKET_CONFIG.items():
 
         if market == "game":
@@ -281,7 +324,11 @@ def run_simulation(req: SimulationRequest):
         market_odds = odds["over_odds"]
 
         mean = (adj_a + adj_b) * cfg["mean_factor"]
-        totals = rng.normal(mean, cfg["sd"], SIMULATIONS)
+        adj_mean = mean + pace_adjust * cfg["mean_factor"]
+        adj_sd = cfg["sd"] * (1 + variance_adjust)
+
+        totals = rng.normal(adj_mean, adj_sd, SIMULATIONS)
+
 
         fair = float(np.mean(totals))
         raw_over = float(np.mean(totals > market_line))

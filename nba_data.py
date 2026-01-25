@@ -251,56 +251,95 @@ TEAM_COORDS = {
     "WAS": (38.8981, -77.0209),   # Wizards – Capital One Arena
 }
 
-
-
 # -------------------------
-# STAR PLAYER MAP
+# STAR PLAYER MAP (TIERED – FULL LEAGUE)
 # -------------------------
+
 STAR_PLAYERS = {
-    # Atlantic
-    "BOS": ["Jayson Tatum", "Jaylen Brown"],
-    "BKN": ["Cam Thomas", "Michael Porter Jr."],
-    "NYK": ["Jalen Brunson", "Karl-Anthony Towns"],
-    "PHI": ["Joel Embiid", "Tyrese Maxey"],
-    "TOR": ["Scottie Barnes", "Brandon Ingram"],
-
-    # Central
-    "CHI": ["Zach LaVine", "Nikola Vucevic"],
-    "CLE": ["Donovan Mitchell", "Darius Garland"],
-    "DET": ["Cade Cunningham"],
-    "IND": ["Tyrese Haliburton", "Pascal Siakam"],
-    "MIL": ["Giannis Antetokounmpo"],
-
-    # Southeast
-    "ATL": ["CJ McCollum", "Kristaps Porzingis"],
-    "CHA": ["LaMelo Ball", "Brandon Miller"],
-    "MIA": ["Bam Adebayo", "Tyler Herro", "Norman Powell"],
-    "ORL": ["Paolo Banchero", "Franz Wagner"],
-    "WAS": ["Trae Young", "Jordan Poole"],
-
-    # Northwest
-    "DEN": ["Nikola Jokic", "Jamal Murray"],
-    "MIN": ["Anthony Edwards"],
-    "OKC": ["Shai Gilgeous-Alexander"],
-    "POR": ["Damian Lillard"],
-    "UTA": ["Lauri Markkanen"],
-
-    # Pacific
-    "GSW": ["Stephen Curry", "Jimmy Butler III"],
-    "LAC": ["Kawhi Leonard", "James Harden"],
-    "LAL": ["LeBron James", "Luka Doncic"],
-    "PHX": ["Devin Booker", "Jalen Green"],
-    "SAC": ["Domantas Sabonis", "DeMar DeRozan"],
-
-    # Southwest
-    "DAL": ["Anthony Davis"],
-    "HOU": ["Kevin Durant", "Alperen Sengun"],
-    "MEM": ["Ja Morant", "Jaren Jackson Jr."],
-    "NOP": ["Zion Williamson", "Dejounte Murray"],
-    "SAS": ["Victor Wembanyama"]
+    "TIER_1": {
+        # Half-court anchors
+        "ATL": ["Kristaps Porzingis"],
+        "BOS": ["Jayson Tatum"],
+        "BKN": ["Cam Thomas"],
+        "CHA": ["LaMelo Ball"],
+        "CHI": ["Nikola Vucevic"],
+        "CLE": ["Donovan Mitchell"],
+        "DAL": ["Anthony Davis"],
+        "DEN": ["Nikola Jokic"],
+        "DET": ["Cade Cunningham"],
+        "GSW": ["Stephen Curry"],
+        "HOU": ["Alperen Sengun"],
+        "IND": ["Tyrese Haliburton"],
+        "LAC": ["Kawhi Leonard"],
+        "LAL": ["LeBron James"],
+        "MEM": ["Ja Morant"],
+        "MIA": ["Bam Adebayo"],
+        "MIL": ["Giannis Antetokounmpo"],
+        "MIN": ["Anthony Edwards"],
+        "NOP": ["Zion Williamson"],
+        "NYK": ["Jalen Brunson"],
+        "OKC": ["Shai Gilgeous-Alexander"],
+        "ORL": ["Paolo Banchero"],
+        "PHI": ["Joel Embiid"],
+        "PHX": ["Devin Booker"],
+        "POR": ["Damian Lillard"],
+        "SAC": ["Domantas Sabonis"],
+        "SAS": ["Victor Wembanyama"],
+        "TOR": ["Scottie Barnes"],
+        "UTA": ["Lauri Markkanen"],
+        "WAS": ["Trae Young"],
+    },
+    "TIER_2": {
+        # Flow / secondary engines
+        "ATL": ["CJ McCollum"],
+        "BOS": ["Jaylen Brown"],
+        "CHA": ["Brandon Miller"],
+        "CHI": ["Zach LaVine"],
+        "CLE": ["Darius Garland"],
+        "DEN": ["Jamal Murray"],
+        "DET": ["Jaden Ivey"],
+        "GSW": ["Jimmy Butler III"],
+        "HOU": ["Kevin Durant"],
+        "IND": ["Pascal Siakam"],
+        "LAC": ["James Harden"],
+        "LAL": ["Luka Doncic"],
+        "MEM": ["Jaren Jackson Jr."],
+        "MIA": ["Tyler Herro"],
+        "MIL": ["Kyle Kuzma"],
+        "NOP": ["Dejounte Murray"],
+        "NYK": ["Karl-Anthony Towns"],
+        "OKC": ["Jalen Williams"],
+        "ORL": ["Franz Wagner"],
+        "PHI": ["Tyrese Maxey"],
+        "POR": ["Anfernee Simons"],
+        "SAC": ["DeMar DeRozan"],
+        "SAS": ["De'Aaron Fox"],
+        "TOR": ["Brandon Ingram"],
+        "WAS": ["Jordan Poole"],
+    },
 }
-all_stars = [p for team in STAR_PLAYERS.values() for p in team]
+
+# -------------------------
+# STAR LOOKUPS (TIER-AWARE)
+# -------------------------
+
+STAR_LOOKUP = {}
+STAR_TIER_LOOKUP = {}
+
+for tier, team_map in STAR_PLAYERS.items():
+    for abbr, players in team_map.items():
+        for p in players:
+            STAR_LOOKUP.setdefault(abbr, []).append(p)
+            STAR_TIER_LOOKUP[p.lower().replace(".", "")] = tier
+
+all_stars = []
+
+for tier_map in STAR_PLAYERS.values():        # TIER_1, TIER_2
+    for players in tier_map.values():         # team -> [players]
+        all_stars.extend(players)
+
 assert len(all_stars) == len(set(all_stars)), "Duplicate star across teams!"
+
 
 # -------------------------
 # HELPERS
@@ -335,9 +374,11 @@ def get_injury_context():
         abbr = team.get("teamTricode")
         players = team.get("players", [])
 
-        star_out = False
+        tier_1_out = False
+        tier_2_out = False
         secondary_out = False
         minutes_factor = 1.0
+
 
         questionable = False
         doubtful = False
@@ -347,20 +388,28 @@ def get_injury_context():
             name = canon(p.get("playerName", ""))
             status = p.get("status", "").upper()
 
-            team_stars = [canon(p) for p in STAR_PLAYERS.get(abbr, [])]
+            team_stars = [canon(p) for p in STAR_LOOKUP.get(abbr, [])]
+
 
             if status == "QUESTIONABLE":
                 questionable = True
 
             if name in team_stars and status == "OUT":
-                star_out = True
-                minutes_factor -= 0.08
+                tier = STAR_TIER_LOOKUP.get(name)
+                if tier == "TIER_1":
+                    tier_1_out = True
+                    minutes_factor -= 0.10
+                elif tier == "TIER_2":
+                    tier_2_out = True
+                    minutes_factor -= 0.06
             elif status == "OUT":
                 secondary_out = True
                 minutes_factor -= 0.03
 
+
         out[abbr] = {
-            "star_out": star_out,
+            "tier_1_out": tier_1_out,
+            "tier_2_out": tier_2_out,
             "secondary_out": secondary_out,
             "questionable": questionable,
             "doubtful": doubtful,
