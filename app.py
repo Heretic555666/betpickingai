@@ -16,6 +16,7 @@ from nba_data import (
     router as nba_router,
     lineups_confirmed,
     get_injury_context,
+    get_nba_game_time,
 )
 
 load_dotenv()
@@ -254,8 +255,7 @@ def run_simulation(req: SimulationRequest):
     rng = np.random.default_rng()
     reset_alerts_if_new_day()
 
-    odds_map = fetch_nba_totals_odds()
-    print(f"ODDS MAP GAMES: {list(odds_map.keys())}")
+   
 
     home_abbr = team_name_to_abbr(req.team_a)
     away_abbr = team_name_to_abbr(req.team_b)
@@ -264,6 +264,48 @@ def run_simulation(req: SimulationRequest):
         return None
 
     game_id = f"{home_abbr}_vs_{away_abbr}"
+
+    # =========================================================
+    # FINAL RUN WINDOW (10 MIN / 2 MIN ONLY)
+    # =========================================================
+
+    now = datetime.now(timezone.utc)
+
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+
+    game_time = get_nba_game_time(
+        req.team_a,
+        req.team_b,
+        date_str,
+    )
+
+
+    if not game_time:
+        print(f"SKIP {game_id} | game time not found")
+        return {"game": game_id, "markets": {}}
+
+    minutes_to_tip = (game_time - now).total_seconds() / 60
+
+    if 9 <= minutes_to_tip <= 11:
+        window = "10m"
+    elif 1 <= minutes_to_tip <= 3:
+        window = "2m"
+    else:
+        window = None
+
+    # Only allow final decision windows
+    if not (
+        9 <= minutes_to_tip <= 11 or
+        1 <= minutes_to_tip <= 3
+    ):
+        print(
+            f"SKIP {game_id} | not in final window "
+            f"({minutes_to_tip:.1f} min to tip)"
+        )
+        return {"game": game_id, "markets": {}}
+    
+    odds_map = fetch_nba_totals_odds()
+    print(f"ODDS MAP GAMES: {list(odds_map.keys())}")
 
     matchup_odds = (
         odds_map.get((home_abbr, away_abbr))
