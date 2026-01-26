@@ -124,6 +124,8 @@ def reset_alerts_if_new_day():
 
 MARKET_CONFIG = {
     "game": {"mean_factor": 1.0, "sd": 12, "early_alert": True},
+    "spread": {"sd": 12},
+    "h2h": {},
     "q1":   {"mean_factor": 0.25, "sd": 6,  "early_alert": False},
     "q2":   {"mean_factor": 0.25, "sd": 6,  "early_alert": False},
     "q3":   {"mean_factor": 0.25, "sd": 6,  "early_alert": False},
@@ -185,15 +187,63 @@ def confidence_score(edge, fair, line, pct):
 
 
 def confidence_tier(score):
-    if score >= 86:
+    if score >= 70:
         return "ELITE"
-    if score >= 71:
+    if score >= 63:
         return "VERY STRONG"
-    if score >= 60:
+    if score >= 58:
         return "STRONG"
-    if score >= 41:
+    if score >= 54:
         return "LEAN"
     return "NOISE"
+
+# =========================================================
+# SPREAD / H2H TIERS
+# =========================================================
+
+def win_prob_tier(win_pct: float) -> str:
+    """
+    Tier purely from win probability.
+    Conservative by design.
+    """
+    if win_pct >= 66:
+        return "ELITE"
+    if win_pct >= 61:
+        return "VERY STRONG"
+    if win_pct >= 57:
+        return "STRONG"
+    if win_pct >= 54:
+        return "LEAN"
+    return "NO BET"
+
+# =========================================================
+# BET FILTERS (BANKROLL PROTECTION)
+# =========================================================
+
+def allow_h2h_bet(win_pct: float, fair_odds: float, tier: str) -> bool:
+    # block weak confidence
+    if tier in ("NO BET", "LEAN"):
+        return False
+
+    # block heavy favorites (vig trap)
+    if fair_odds < 1.45:
+        return False
+
+    # block thin edges
+    if win_pct < 52:
+        return False
+
+    return True
+
+
+def allow_spread_bet(win_pct: float, tier: str) -> bool:
+    if tier in ("NO BET", "LEAN"):
+        return False
+
+    if win_pct < 55:
+        return False
+
+    return True
 
 
 # =========================================================
@@ -325,6 +375,134 @@ def run_simulation(req: SimulationRequest):
 
     for market, cfg in MARKET_CONFIG.items():
 
+        # =========================
+        # FULL GAME SPREAD (NO ODDS)
+        # =========================
+        if market == "spread":
+            spread_mean = adj_a - adj_b
+            spread_sd = cfg["sd"] * (1 + variance_adjust)
+
+            margins = rng.normal(spread_mean, spread_sd, SIMULATIONS)
+
+            fair_spread = round(-float(np.mean(margins)), 1)
+
+            home_win_prob = float(np.mean(margins > 0))
+            away_win_prob = 1 - home_win_prob
+
+            home_pct = round(home_win_prob * 100, 1)
+            away_pct = round(away_win_prob * 100, 1)
+
+            results["spread"] = {
+                "fair_spread": fair_spread,
+                "home_win_pct": home_pct,
+                "away_win_pct": away_pct,
+            }
+
+            # --------
+            # TIERS
+            # --------
+            win_pct = max(home_pct, away_pct)
+
+            if abs(fair_spread) < 2.0:
+                continue
+
+            tier = win_prob_tier(win_pct)
+
+            if tier not in ("ELITE", "VERY STRONG", "STRONG"):
+                continue
+
+
+            # --------
+            # FILTERS
+            # --------
+            if not allow_spread_bet(win_pct, tier):
+                continue
+
+            # --------
+            # TELEGRAM
+            # --------
+            pick_side = "HOME" if home_pct > away_pct else "AWAY"
+            pick_emoji = "🏠" if pick_side == "HOME" else "✈️"
+
+            key = f"{game_id}_spread_{fair_spread}_{tier}"
+
+            if key not in SENT_ALERTS:
+                SENT_ALERTS.add(key)
+
+                message = (
+                    f"📏 FULL GAME SPREAD — {tier}\n"
+                    f"{pick_emoji} PICK: {pick_side}\n\n"
+                    f"{req.team_a} vs {req.team_b}\n"
+                    f"📐 Fair Spread: {fair_spread}\n"
+                    f"🏠 Home win %: {home_pct}%\n"
+                    f"✈️ Away win %: {away_pct}%\n"
+                    f"🏥 Injuries Included: YES\n"
+                )
+
+                send_telegram_alert(
+                    message,
+                    pace_adjust=pace_adjust,
+                    variance_adjust=variance_adjust,
+                )
+
+            continue
+
+        # =========================
+        # H2H / MONEYLINE (NO ODDS)
+        # =========================
+        if market == "h2h":
+            home_pct = results["spread"]["home_win_pct"]
+            away_pct = results["spread"]["away_win_pct"]
+
+            home_prob = home_pct / 100
+            away_prob = away_pct / 100
+
+            if home_prob <= 0 or away_prob <= 0:
+                continue
+
+            fair_home = round(1 / home_prob, 2)
+            fair_away = round(1 / away_prob, 2)
+
+            results["h2h"] = {
+                "home_win_pct": home_pct,
+                "away_win_pct": away_pct,
+                "fair_home_odds": fair_home,
+                "fair_away_odds": fair_away,
+            }
+
+            pick_team = req.team_a if home_pct > away_pct else req.team_b
+            pick_pct = max(home_pct, away_pct)
+            pick_odds = fair_home if home_pct > away_pct else fair_away
+
+            tier = win_prob_tier(pick_pct)
+
+            if not allow_h2h_bet(pick_pct, pick_odds, tier):
+                continue
+
+            key = f"{game_id}_h2h_{pick_pct}_{tier}"
+
+            if key not in SENT_ALERTS:
+                SENT_ALERTS.add(key)
+
+                message = (
+                    f"💰 MONEYLINE — {tier}\n"
+                    f"🏆 PICK: {pick_team}\n\n"
+                    f"{req.team_a} vs {req.team_b}\n"
+                    f"📊 Win Prob: {pick_pct}%\n"
+                    f"📈 Fair Odds: {pick_odds}\n"
+                    f"🏥 Injuries Included: YES\n"
+                )
+
+                send_telegram_alert(
+                    message,
+                    pace_adjust=pace_adjust,
+                    variance_adjust=variance_adjust,
+                )
+
+            continue
+
+        
+
         if market == "game":
             odds = matchup_odds.get("totals")
         elif market == "q1":
@@ -390,6 +568,8 @@ def run_simulation(req: SimulationRequest):
             "q2": "⏱️ Q2 TOTAL",
             "q3": "⏱️ Q3 TOTAL",
             "q4": "⏱️ Q4 TOTAL",
+            "spread": "📏 FULL GAME SPREAD",
+            "h2h": "💰 MONEYLINE",
         }.get(market, market.upper())
 
         
@@ -503,11 +683,7 @@ async def pregame_alert_scheduler():
                 prefix = "⏰ 10 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "⏰ 10 MIN")
-                send_telegram_alert(
-                    prefix + msg,
-                    pace_adjust=results["game"]["pace_adjust"],
-                    variance_adjust=results["game"]["variance_adjust"],
-                )
+                send_telegram_alert(prefix + msg)
                 alert["sent_10"] = True
 
             # 🚨 2-minute alert
@@ -522,11 +698,7 @@ async def pregame_alert_scheduler():
                 prefix = "🚨 2 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "🚨 2 MIN")
-                send_telegram_alert(
-                    prefix + msg,
-                    pace_adjust=results["game"]["pace_adjust"],
-                    variance_adjust=results["game"]["variance_adjust"],
-                )
+                send_telegram_alert(prefix + msg)
                 alert["sent_2"] = True
 
         await asyncio.sleep(60)

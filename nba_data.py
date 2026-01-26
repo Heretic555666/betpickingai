@@ -121,13 +121,14 @@ def fetch_nba_totals_odds():
     ODDS_API_BASE = "https://api.the-odds-api.com/v4/sports/basketball_nba/odds"
     ODDS_API_KEY = os.getenv("ODDS_API_KEY")
     
+
     if not ODDS_API_KEY:
         print("❌ ODDS_API_KEY missing")
         return {}
     params = {
         "apiKey": ODDS_API_KEY,
         "regions": "us",
-        "markets": "totals",
+        "markets": "totals,spreads,h2h",
         "oddsFormat": "decimal",
     }
 
