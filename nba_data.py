@@ -321,6 +321,83 @@ STAR_PLAYERS = {
 }
 
 # -------------------------
+# DEFENSIVE STAR MAP (LOCKED ROSTERS ONLY)
+# -------------------------
+
+# -------------------------
+# DEFENSIVE STAR MAP (LOCKED ROSTERS ONLY)
+# -------------------------
+
+DEFENSIVE_PLAYERS = {
+    "DEF_TIER_1": {
+        # Primary defensive anchors
+        "ATL": ["Kristaps Porzingis"],
+        "BOS": ["Jrue Holiday"],
+        "BKN": ["Nic Claxton"],
+        "CHA": ["Grant Williams"],
+        "CHI": ["Isaac Okoro"],
+        "CLE": ["Evan Mobley"],
+        "DAL": ["Anthony Davis"],
+        "DEN": ["Aaron Gordon"],
+        "DET": ["Ausar Thompson"],
+        "GSW": ["Draymond Green"],
+        "HOU": ["Amen Thompson"],
+        "IND": ["Pascal Siakam"],
+        "LAC": ["Kawhi Leonard"],
+        "LAL": [],
+        "MEM": ["Jaren Jackson Jr."],
+        "MIA": ["Bam Adebayo"],
+        "MIL": ["Giannis Antetokounmpo"],
+        "MIN": ["Rudy Gobert"],
+        "NOP": ["Herbert Jones"],
+        "NYK": ["OG Anunoby"],
+        "OKC": ["Chet Holmgren"],
+        "ORL": ["Jonathan Isaac"],
+        "PHI": ["Joel Embiid"],
+        "PHX": ["Royce O’Neale"],
+        "POR": ["Matisse Thybulle"],
+        "SAC": ["Domantas Sabonis"],
+        "SAS": ["Victor Wembanyama"],
+        "TOR": ["Scottie Barnes"],
+        "UTA": ["Walker Kessler"],
+        "WAS": ["Alex Sarr"],
+    },
+    "DEF_TIER_2": {
+        # Secondary / matchup defenders
+        "ATL": ["Dyson Daniels"],
+        "BOS": ["Derrick White"],
+        "BKN": ["Mikal Bridges"],
+        "CHA": ["Josh Green"],
+        "CHI": ["Patrick Williams"],
+        "CLE": ["Jarrett Allen"],
+        "DAL": ["P.J. Washington"],
+        "DEN": ["Peyton Watson"],
+        "DET": ["Isaiah Stewart"],
+        "GSW": ["Jimmy Butler III"],
+        "HOU": ["Dorian Finney-Smith"],
+        "IND": ["Aaron Nesmith"],
+        "LAC": ["Ivica Zubac"],
+        "LAL": ["Jarred Vanderbilt"],
+        "MEM": ["Vince Williams Jr."],
+        "MIA": ["Andrew Wiggins"],
+        "MIL": ["Brook Lopez"],
+        "MIN": ["Jaden McDaniels"],
+        "NOP": ["Trey Murphy III"],
+        "NYK": ["Josh Hart"],
+        "OKC": ["Luguentz Dort"],
+        "ORL": ["Jalen Suggs"],
+        "PHI": ["Paul George"],
+        "POR": ["Toumani Camara"],
+        "SAC": ["Keegan Murray"],
+        "SAS": ["Jeremy Sochan"],
+        "TOR": ["RJ Barrett"],
+        "UTA": ["Taylor Hendricks"],
+        "WAS": ["Bilal Coulibaly"],
+    },
+}
+
+
+# -------------------------
 # STAR LOOKUPS (TIER-AWARE)
 # -------------------------
 
@@ -340,6 +417,27 @@ for tier_map in STAR_PLAYERS.values():        # TIER_1, TIER_2
         all_stars.extend(players)
 
 assert len(all_stars) == len(set(all_stars)), "Duplicate star across teams!"
+
+# Safety: ensure no defensive player is duplicated across teams
+all_defs = []
+for tier_map in DEFENSIVE_PLAYERS.values():
+    for players in tier_map.values():
+        all_defs.extend(players)
+
+assert len(all_defs) == len(set(all_defs)), "Duplicate defensive player detected!"
+
+# -------------------------
+# DEFENSIVE LOOKUPS
+# -------------------------
+
+DEF_LOOKUP = {}
+DEF_TIER_LOOKUP = {}
+
+for tier, team_map in DEFENSIVE_PLAYERS.items():
+    for abbr, players in team_map.items():
+        for p in players:
+            DEF_LOOKUP.setdefault(abbr, []).append(p)
+            DEF_TIER_LOOKUP[p.lower().replace(".", "")] = tier
 
 
 # -------------------------
