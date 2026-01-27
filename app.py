@@ -698,6 +698,22 @@ def run_simulation(req: SimulationRequest):
         b2b_label = f"🔁 Back-to-Back: {', '.join(b2b_tags)}\n" if b2b_tags else ""
  
         # -------------------------
+        # DEFENSIVE CONTEXT TAG (DISPLAY ONLY)
+        # -------------------------
+
+        def_tag = ""
+        if (
+            home_ctx.get("def_tier_1_out")
+            or away_ctx.get("def_tier_1_out")
+        ):
+            def_tag = "🛑 Elite defender OUT\n"
+        elif (
+            home_ctx.get("def_tier_2_out")
+            or away_ctx.get("def_tier_2_out")
+        ):
+            def_tag = "🟡 Key defender OUT\n"
+
+        # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
 
@@ -705,6 +721,7 @@ def run_simulation(req: SimulationRequest):
             f"{stage_emoji} {bet_stage} {market_label}\n"
             f"{side_emoji} PICK: {bet_side}\n\n"
             f"{req.team_a} vs {req.team_b}\n"
+            f"{def_tag}"
             f"{b2b_label}"
             f"✈️ Away Travel: {round(req.team_b_travel_km)} km\n"
             f"📈 Line: {market_line}\n"
