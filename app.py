@@ -50,6 +50,15 @@ PACE_MODIFIERS = {
     },
 }
 
+# -------------------------
+# DEFENSIVE TOTALS IMPACT
+# -------------------------
+
+DEF_TOTALS_IMPACT = {
+    "DEF_TIER_1": -1.25,
+    "DEF_TIER_2": -0.75,
+}
+
 # =========================================================
 # TELEGRAM
 # =========================================================
@@ -414,6 +423,19 @@ def run_simulation(req: SimulationRequest):
             f"pace_adjust={pace_adjust:.2f}, variance_adjust={variance_adjust:.2f} | "
             f"home_ctx={home_ctx} | away_ctx={away_ctx}"
         )
+    
+    # -------------------------
+    # DEFENSIVE TOTALS ADJUST
+    # -------------------------
+
+    def_totals_adjust = 0.0
+
+    for ctx in (home_ctx, away_ctx):
+        if ctx.get("def_tier_1_out"):
+            def_totals_adjust += abs(DEF_TOTALS_IMPACT["DEF_TIER_1"])
+
+        if ctx.get("def_tier_2_out"):
+            def_totals_adjust += abs(DEF_TOTALS_IMPACT["DEF_TIER_2"])
 
     for market, cfg in MARKET_CONFIG.items():
 
@@ -566,7 +588,12 @@ def run_simulation(req: SimulationRequest):
         market_odds = odds["over_odds"]
 
         mean = (adj_a + adj_b) * cfg["mean_factor"]
-        adj_mean = mean + pace_adjust * cfg["mean_factor"]
+        adj_mean = (
+            mean
+            + pace_adjust * cfg["mean_factor"]
+            + def_totals_adjust * cfg["mean_factor"]
+        )
+
         adj_sd = cfg["sd"] * (1 + variance_adjust)
 
         totals = rng.normal(adj_mean, adj_sd, SIMULATIONS)
