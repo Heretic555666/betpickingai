@@ -631,6 +631,10 @@ def run_simulation(req: SimulationRequest):
 
         bet_side = "OVER" if over_prob > under_prob else "UNDER"
         side_emoji = "⬆️" if bet_side == "OVER" else "⬇️"
+        # -------------------------
+        # BET REASONS (DISPLAY ONLY)
+        # -------------------------
+        reasons = []
 
         edge = cap_edge(cal_over - implied_prob(market_odds))
         pct = percentile_position(totals, market_line)
@@ -639,6 +643,31 @@ def run_simulation(req: SimulationRequest):
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
         
+        # -------------------------
+        # DIRECTIONAL EDGE REASONS
+        # -------------------------
+
+        if bet_side == "OVER":
+            if pct >= 65:
+                reasons.append("Total distribution heavily above market line")
+            if edge >= 0.04:
+                reasons.append("Model projects meaningful over edge vs book")
+
+        if bet_side == "UNDER":
+            if pct <= 35:
+                reasons.append("Total distribution heavily below market line")
+            if edge <= -0.04:
+                reasons.append("Model projects meaningful under edge vs book")
+
+        if pace_adjust >= 1.0:
+            reasons.append("Fast pace environment")
+
+        if pace_adjust <= -1.0:
+            reasons.append("Slow pace environment")
+
+        if variance_adjust >= 0.6:
+            reasons.append("High variance game profile")
+
         # -------------------------
         # DEFENSIVE CONFIDENCE BUMP (TOTALS / OVER ONLY)
         # -------------------------
@@ -737,6 +766,14 @@ def run_simulation(req: SimulationRequest):
             def_tag = "🟡 Key defender OUT\n"
 
         # -------------------------
+        # BET REASON TEXT (DISPLAY)
+        # -------------------------
+
+        reason_text = ""
+        if reasons:
+            reason_text = "🧠 Why this bet:\n" + "\n".join(f"• {r}" for r in reasons) + "\n\n"
+
+        # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
 
@@ -744,6 +781,7 @@ def run_simulation(req: SimulationRequest):
             f"{stage_emoji} {bet_stage} {market_label}\n"
             f"{side_emoji} PICK: {bet_side}\n\n"
             f"{req.team_a} vs {req.team_b}\n"
+            f"{reason_text}"
             f"{def_tag}"
             f"{b2b_label}"
             f"✈️ Away Travel: {round(req.team_b_travel_km)} km\n"
