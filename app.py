@@ -796,6 +796,31 @@ async def daily_auto_run():
 
         await asyncio.sleep(60)
 
+async def live_game_monitor():
+    print("📡 Live game monitor active")
+
+    while True:
+        try:
+            games = build_model_inputs()
+            for g in games or []:
+                req = SimulationRequest(
+                    team_a=g["team_a"],
+                    team_b=g["team_b"],
+                    game_time=g["game_time"],
+                    home_team=g.get("home_team", "A"),
+                    team_a_travel_km=g.get("team_a_travel_km", 0),
+                    team_b_travel_km=g.get("team_b_travel_km", 0),
+                    team_a_b2b=g.get("team_a_b2b", False),
+                    team_b_b2b=g.get("team_b_b2b", False),
+                )
+
+                await anyio.to_thread.run_sync(run_simulation, req)
+
+        except Exception as e:
+            print("❌ Live monitor error:", e)
+
+        # every 3 minutes (safe, low usage)
+        await asyncio.sleep(180)
 
 # =========================================================
 # STARTUP
@@ -805,7 +830,7 @@ async def daily_auto_run():
 async def startup():
     asyncio.create_task(pregame_alert_scheduler())
     asyncio.create_task(daily_auto_run())
-
+    asyncio.create_task(live_game_monitor())
 
 @app.get("/test/telegram")
 def test_telegram():
