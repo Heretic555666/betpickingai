@@ -615,6 +615,23 @@ def run_simulation(req: SimulationRequest):
 
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
+        
+        # -------------------------
+        # DEFENSIVE CONFIDENCE BUMP (TOTALS / OVER ONLY)
+        # -------------------------
+
+        if bet_side == "OVER" and tier in ("LEAN", "STRONG", "VERY STRONG"):
+            if (
+                home_ctx.get("def_tier_1_out")
+                or away_ctx.get("def_tier_1_out")
+                or home_ctx.get("def_tier_2_out")
+                or away_ctx.get("def_tier_2_out")
+            ):
+                tier = {
+                    "LEAN": "STRONG",
+                    "STRONG": "VERY STRONG",
+                    "VERY STRONG": "ELITE",
+                }.get(tier, tier)
 
         results[market] = {
             "line": market_line,
