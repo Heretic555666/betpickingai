@@ -637,12 +637,35 @@ def run_simulation(req: SimulationRequest):
         reasons = []
 
         edge = cap_edge(cal_over - implied_prob(market_odds))
+        # -------------------------
+        # TRAP WARNING DETECTION
+        # -------------------------
+
+        trap_warning = False
+
+        # Over trap: model likes over, but book shaded line higher than fair
+        if bet_side == "OVER" and market_line > fair + 1.0:
+            trap_warning = True
+
+        # Under trap: model likes under, but book shaded line lower than fair
+        if bet_side == "UNDER" and market_line < fair - 1.0:
+            trap_warning = True
+
         pct = percentile_position(totals, market_line)
 
 
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
         
+        # -------------------------
+        # TRAP WARNING REASON
+        # -------------------------
+
+        if trap_warning:
+            reasons.append(
+                "⚠️ Trap warning: market line shaded against model fair value"
+            )
+
         # -------------------------
         # DIRECTIONAL EDGE REASONS
         # -------------------------
@@ -772,6 +795,14 @@ def run_simulation(req: SimulationRequest):
         reason_text = ""
         if reasons:
             reason_text = "🧠 Why this bet:\n" + "\n".join(f"• {r}" for r in reasons) + "\n\n"
+        
+        # -------------------------
+        # TRAP WARNING TAG (DISPLAY ONLY)
+        # -------------------------
+
+        trap_tag = ""
+        if trap_warning:
+            trap_tag = "⚠️ TRAP WARNING\n"
 
         # -------------------------
         # TELEGRAM MESSAGE
@@ -782,6 +813,7 @@ def run_simulation(req: SimulationRequest):
             f"{side_emoji} PICK: {bet_side}\n\n"
             f"{req.team_a} vs {req.team_b}\n"
             f"{reason_text}"
+            f"{trap_tag}"
             f"{def_tag}"
             f"{b2b_label}"
             f"✈️ Away Travel: {round(req.team_b_travel_km)} km\n"
