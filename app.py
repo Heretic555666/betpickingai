@@ -433,9 +433,24 @@ def run_simulation(req: SimulationRequest):
     for ctx in (home_ctx, away_ctx):
         if ctx.get("def_tier_1_out"):
             def_totals_adjust += abs(DEF_TOTALS_IMPACT["DEF_TIER_1"])
-
         if ctx.get("def_tier_2_out"):
             def_totals_adjust += abs(DEF_TOTALS_IMPACT["DEF_TIER_2"])
+
+    # -------------------------
+    # DEFENSIVE SPREAD VARIANCE ADJUST (VARIANCE ONLY)
+    # -------------------------
+
+    def_spread_variance = 0.0
+
+    for ctx in (home_ctx, away_ctx):
+        if ctx.get("def_tier_1_out"):
+            def_spread_variance += 0.10   # +10% variance
+        if ctx.get("def_tier_2_out"):
+            def_spread_variance += 0.06   # +6% variance
+
+    # =========================
+    # MARKET LOOP
+    # =========================
 
     for market, cfg in MARKET_CONFIG.items():
 
@@ -444,7 +459,8 @@ def run_simulation(req: SimulationRequest):
         # =========================
         if market == "spread":
             spread_mean = adj_a - adj_b
-            spread_sd = cfg["sd"] * (1 + variance_adjust)
+            spread_sd = cfg["sd"] * (1 + variance_adjust + def_spread_variance)
+
 
             margins = rng.normal(spread_mean, spread_sd, SIMULATIONS)
 
