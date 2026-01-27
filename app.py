@@ -436,6 +436,12 @@ def run_simulation(req: SimulationRequest):
         if ctx.get("def_tier_2_out"):
             def_totals_adjust += abs(DEF_TOTALS_IMPACT["DEF_TIER_2"])
 
+    # Defensive context explanation
+    if home_ctx.get("def_tier_1_out") or away_ctx.get("def_tier_1_out"):
+        reasons.append("Elite defender absence increases scoring efficiency")
+    elif home_ctx.get("def_tier_2_out") or away_ctx.get("def_tier_2_out"):
+        reasons.append("Key defensive absence slightly boosts offensive output")
+
     # -------------------------
     # DEFENSIVE SPREAD VARIANCE ADJUST (VARIANCE ONLY)
     # -------------------------
@@ -637,6 +643,15 @@ def run_simulation(req: SimulationRequest):
         reasons = []
 
         edge = cap_edge(cal_over - implied_prob(market_odds))
+        
+        # Edge explanation
+        if edge >= 0.06:
+            reasons.append("Strong model edge vs market price")
+        elif edge >= 0.04:
+            reasons.append("Clear model edge vs market price")
+        elif edge >= 0.025:
+            reasons.append("Moderate pricing edge identified")
+        
         # -------------------------
         # TRAP WARNING DETECTION
         # -------------------------
@@ -652,7 +667,18 @@ def run_simulation(req: SimulationRequest):
             trap_warning = True
 
         pct = percentile_position(totals, market_line)
-
+        
+        # Distribution skew explanation
+        if bet_side == "OVER":
+            if pct >= 70:
+                reasons.append("Total outcomes cluster well above market line")
+            elif pct >= 60:
+                reasons.append("Distribution slightly favors higher scoring")
+        elif bet_side == "UNDER":
+            if pct <= 30:
+                reasons.append("Total outcomes cluster well below market line")
+            elif pct <= 40:
+                reasons.append("Distribution slightly favors lower scoring")
 
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
@@ -683,13 +709,13 @@ def run_simulation(req: SimulationRequest):
                 reasons.append("Model projects meaningful under edge vs book")
 
         if pace_adjust >= 1.0:
-            reasons.append("Fast pace environment")
+            reasons.append("Projected fast pace increases total possession count")
 
         if pace_adjust <= -1.0:
-            reasons.append("Slow pace environment")
+            reasons.append("Projected slow pace suppresses total scoring volume")
 
         if variance_adjust >= 0.6:
-            reasons.append("High variance game profile")
+            reasons.append("High variance game profile increases tail outcomes")
 
         # -------------------------
         # DEFENSIVE CONFIDENCE BUMP (TOTALS / OVER ONLY)
