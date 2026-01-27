@@ -622,6 +622,13 @@ def run_simulation(req: SimulationRequest):
         over_prob = cal_over
         under_prob = 1 - cal_over
 
+        # -------------------------
+        # TOTALS SANITY FILTER (REMOVE COIN FLIPS)
+        # -------------------------
+
+        if abs(over_prob - 0.50) < 0.06:
+            continue
+
         bet_side = "OVER" if over_prob > under_prob else "UNDER"
         side_emoji = "⬆️" if bet_side == "OVER" else "⬇️"
 
