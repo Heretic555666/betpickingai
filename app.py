@@ -21,6 +21,8 @@ from nba_data import (
 
 load_dotenv()
 
+last_heartbeat_date = None
+
 # =========================================================
 # ENV / APP SETUP
 # =========================================================
@@ -925,6 +927,36 @@ async def pregame_alert_scheduler():
 
         await asyncio.sleep(60)
 
+# =========================================================
+# MONITOR ALIVE HEARTBEAT (1x per day)
+# =========================================================
+
+async def monitor_alive_heartbeat():
+    global last_heartbeat_date
+
+    print("❤️ Monitor-alive heartbeat scheduler active")
+
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            today = now.date()
+
+            if last_heartbeat_date != today:
+                send_telegram_alert(
+                    "❤️ BetPicking AI is alive\n\n"
+                    "• Railway running\n"
+                    "• Background tasks active\n"
+                    "• PC not required"
+                )
+                last_heartbeat_date = today
+                print("❤️ Heartbeat sent")
+
+        except Exception as e:
+            print("❌ Heartbeat error:", e)
+
+        # check every 10 minutes (safe & cheap)
+        await asyncio.sleep(600)
+
 
 # =========================================================
 # DAILY AUTO-RUN (FIXED)
@@ -1011,7 +1043,8 @@ async def startup():
     asyncio.create_task(pregame_alert_scheduler())
     asyncio.create_task(daily_auto_run())
     asyncio.create_task(live_game_monitor())
-
+    asyncio.create_task(monitor_alive_heartbeat())
+    
 @app.get("/test/telegram")
 def test_telegram():
     send_telegram_alert("✅ Telegram test successful")
