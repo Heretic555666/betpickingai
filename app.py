@@ -280,7 +280,7 @@ def run_simulation(req: SimulationRequest):
 
     now = datetime.now(timezone.utc)
 
-    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    date_str = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime("%Y%m%d")
 
     game_time = get_nba_game_time(
         req.team_a,
