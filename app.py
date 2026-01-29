@@ -315,14 +315,14 @@ def run_simulation(req: SimulationRequest):
 
     # Only allow final decision windows
     if not (
-        9 <= minutes_to_tip <= 11 or
-        1 <= minutes_to_tip <= 3
+        20 <= minutes_to_tip <= 30 or   # early safety
+        9 <= minutes_to_tip <= 11 or    # 10-min
+        1 <= minutes_to_tip <= 3 or     # 2-min
+        -2 <= minutes_to_tip <= 0       # post-tip grace
     ):
-        print(
-            f"SKIP {game_id} | not in final window "
-            f"({minutes_to_tip:.1f} min to tip)"
-        )
+        print(f"SKIP {game_id} | not in decision window ({minutes_to_tip:.1f} min)")
         return {"game": game_id, "markets": {}}
+
     
     odds_map = fetch_nba_totals_odds()
     print(f"ODDS MAP GAMES: {list(odds_map.keys())}")
@@ -643,7 +643,7 @@ def run_simulation(req: SimulationRequest):
         # TOTALS SANITY FILTER (REMOVE COIN FLIPS)
         # -------------------------
 
-        if abs(over_prob - 0.50) < 0.06:
+        if abs(over_prob - 0.50) < 0.045:
             continue
 
         bet_side = "OVER" if over_prob > under_prob else "UNDER"
