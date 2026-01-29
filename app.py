@@ -282,18 +282,27 @@ def run_simulation(req: SimulationRequest):
 
     now = datetime.now(timezone.utc)
 
-    date_str = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime("%Y%m%d")
+    now_utc = datetime.now(timezone.utc)
 
-    game_time = get_nba_game_time(
-        req.team_a,
-        req.team_b,
-        date_str,
-    )
+    date_candidates = [
+        now_utc.strftime("%Y%m%d"),
+        (now_utc + timedelta(days=1)).strftime("%Y%m%d"),
+    ]
+
+    game_time = None
+    for ds in date_candidates:
+        game_time = get_nba_game_time(req.team_a, req.team_b, ds)
+        if game_time:
+            break
 
 
     if not game_time:
-        print(f"SKIP {game_id} | game time not found")
+        print(
+            f"SKIP {game_id} | no game time found "
+            f"(dates tried: {date_candidates})"
+        )
         return {"game": game_id, "markets": {}}
+
 
     minutes_to_tip = (game_time - now).total_seconds() / 60
 
@@ -1044,7 +1053,7 @@ async def startup():
     asyncio.create_task(daily_auto_run())
     asyncio.create_task(live_game_monitor())
     asyncio.create_task(monitor_alive_heartbeat())
-    
+
 @app.get("/test/telegram")
 def test_telegram():
     send_telegram_alert("✅ Telegram test successful")
