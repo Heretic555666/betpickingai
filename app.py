@@ -952,13 +952,12 @@ async def monitor_alive_heartbeat():
 
             if last_heartbeat_date != today:
                 send_telegram_alert(
-                    "❤️ BetPicking AI is alive\n\n"
-                    "• Railway running\n"
-                    "• Background tasks active\n"
-                    "• PC not required"
+                    "BetPicking AI monitor alive\n"
+                    "Railway running | background tasks active | PC not required"
                 )
+
                 last_heartbeat_date = today
-                print("❤️ Heartbeat sent")
+                print("Heartbeat sent")
 
         except Exception as e:
             print("❌ Heartbeat error:", e)
