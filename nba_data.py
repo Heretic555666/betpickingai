@@ -194,10 +194,17 @@ def get_nba_game_time(team_a: str, team_b: str, date_str: str):
     games = data.get("scoreboard", {}).get("games", [])
 
     for game in games:
-        home = game["homeTeam"]["teamName"]
-        away = game["awayTeam"]["teamName"]
+        home_abbr = game["homeTeam"]["teamTricode"]
+        away_abbr = game["awayTeam"]["teamTricode"]
 
-        if team_a in (home, away) and team_b in (home, away):
+        a = team_name_to_abbr(team_a)
+        b = team_name_to_abbr(team_b)
+
+        if not a or not b:
+            return None
+
+        if a in (home_abbr, away_abbr) and b in (home_abbr, away_abbr):
+
             tip = game.get("gameTimeUTC")
             if tip:
                 return datetime.fromisoformat(

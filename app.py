@@ -287,6 +287,7 @@ def run_simulation(req: SimulationRequest):
     date_candidates = [
         now_utc.strftime("%Y%m%d"),
         (now_utc + timedelta(days=1)).strftime("%Y%m%d"),
+        (now_utc - timedelta(days=1)).strftime("%Y%m%d"),
     ]
 
     game_time = None
@@ -298,10 +299,12 @@ def run_simulation(req: SimulationRequest):
 
     if not game_time:
         print(
-            f"SKIP {game_id} | no game time found "
+            f"SKIP {game_id} | game detected upstream, "
+            f"but not actionable yet "
             f"(dates tried: {date_candidates})"
         )
         return {"game": game_id, "markets": {}}
+
 
 
     minutes_to_tip = (game_time - now).total_seconds() / 60
@@ -993,21 +996,54 @@ async def daily_auto_run():
 
                 # pull today's games from NBA API
                 games = build_model_inputs()
+
+                # =====================================================
+                # SAFEGUARD: GAME TIME CONSISTENCY CHECK (READ-ONLY)
+                # =====================================================
+                if games:
+                    for g in games:
+                        sanity_time = get_nba_game_time(
+                            g["team_a"],
+                            g["team_b"],
+                            g["game_time"].strftime("%Y%m%d"),
+                        )
+                        if not sanity_time:
+                            print(
+                                f"🚨 TIME MISMATCH: build_model_inputs has game, "
+                                f"but get_nba_game_time failed for "
+                                f"{g['team_a']} vs {g['team_b']}"
+                            )
+
+                # =====================================================
+                # OPTIONAL: ZERO-GAMES WARNING (OFF BY DEFAULT)
+                # =====================================================
+                if os.getenv("ALERT_ON_ZERO_GAMES") == "true":
+                    if not games:
+                        send_telegram_alert(
+                            "🚨 WARNING: NBA auto-run found ZERO games today.\n"
+                            "Check NBA API / date resolution immediately."
+                        )
+
+                # =====================================================
+                # EXISTING LOGIC — UNCHANGED
+                # =====================================================
                 for g in games or []:
                     req = SimulationRequest(
                         team_a=g["team_a"],
                         team_b=g["team_b"],
                         game_time=g["game_time"],
                         home_team=g.get("home_team", "A"),
-
                         team_a_travel_km=g.get("team_a_travel_km", 0),
                         team_b_travel_km=g.get("team_b_travel_km", 0),
                         team_a_b2b=g.get("team_a_b2b", False),
                         team_b_b2b=g.get("team_b_b2b", False),
-                )
+                    )
 
                     result = await anyio.to_thread.run_sync(run_simulation, req)
                     print("✅ Auto-run game complete:", result)
+
+            except Exception as e:
+                print("❌ Auto-run error:", e)
 
                 last_run_date = now.date()
                 print("✅ Daily auto-run complete")
