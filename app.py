@@ -202,13 +202,13 @@ def confidence_score(edge, fair, line, pct):
 
 
 def confidence_tier(score):
-    if score >= 68:
+    if score >= 72:
         return "ELITE"
-    if score >= 62:
+    if score >= 67:
         return "VERY STRONG"
-    if score >= 57:
+    if score >= 60:
         return "STRONG"
-    if score >= 54:
+    if score >= 56:
         return "LEAN"
     return "NOISE"
 
@@ -221,13 +221,13 @@ def win_prob_tier(win_pct: float) -> str:
     Tier purely from win probability.
     Conservative by design.
     """
-    if win_pct >= 68:
+    if win_pct >= 72:
         return "ELITE"
-    if win_pct >= 62:
+    if win_pct >= 67:
         return "VERY STRONG"
-    if win_pct >= 57:
+    if win_pct >= 60:
         return "STRONG"
-    if win_pct >= 54:
+    if win_pct >= 56:
         return "LEAN"
     return "NO BET"
 
@@ -506,7 +506,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
             tier = win_prob_tier(win_pct)
 
-            if tier not in ("ELITE", "VERY STRONG", "STRONG"):
+            if tier not in ("ELITE", "VERY STRONG"):
                 continue
 
 
@@ -755,7 +755,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # =========================
         # DAILY ALERTS (NON-TIMING)
         # =========================
-        if ignore_time_window and tier in ("ELITE", "VERY STRONG", "STRONG"):
+        if ignore_time_window and tier in ("ELITE", "VERY STRONG"):
             daily_key = f"DAILY_{game_id}_{market}_{market_line}_{tier}"
 
             if daily_key not in DAILY_SENT_ALERTS:
