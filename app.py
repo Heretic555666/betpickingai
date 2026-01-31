@@ -1074,6 +1074,8 @@ async def live_game_monitor():
 
         except Exception as e:
             print("❌ Live monitor error:", e)
+            print("🌐 Network error (transient):", e)
+            await asyncio.sleep(30)
 
         # every 3 minutes (safe, low usage)
         await asyncio.sleep(180)
