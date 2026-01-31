@@ -471,6 +471,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     # =========================
 
     for market, cfg in MARKET_CONFIG.items():
+        bet_side = None
 
         # =========================
         # FULL GAME SPREAD (NO ODDS)
@@ -520,7 +521,8 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             # SPREAD REASONS
             # -------------------------
             spread_reasons = [
-                f"Model projects {home_pct if pick_side=='HOME' else away_pct}% win probability",
+                f"Model projects {home_pct if bet_side=='HOME' else away_pct}% win probability"
+
                 f"Fair spread ({fair_spread}) differs meaningfully from expected margin",
             ]
 
@@ -539,8 +541,9 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             # --------
             # TELEGRAM
             # --------
-            pick_side = "HOME" if home_pct > away_pct else "AWAY"
-            pick_emoji = "🏠" if pick_side == "HOME" else "✈️"
+            bet_side = "HOME" if home_pct > away_pct else "AWAY"
+
+            pick_emoji = "🏠" if bet_side == "HOME" else "✈️"
 
             key = f"{game_id}_spread_{fair_spread}_{tier}"
 
@@ -549,7 +552,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
                 message = (
                     f"📏 FULL GAME SPREAD — {tier}\n"
-                    f"{pick_emoji} PICK: {pick_side}\n\n"
+                    f"{pick_emoji} PICK: {bet_side}\n\n"
                     f"{req.team_a} vs {req.team_b}\n"
                     f"{reason_text}"
                     f"📐 Fair Spread: {fair_spread}\n"
@@ -928,10 +931,10 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
-       
+        
         message = (
             f"{stage_emoji} {bet_stage} {market_label}\n"
-            f"{side_emoji} PICK: {bet_side}\n\n"
+            f"{side_emoji} PICK: {bet_side if bet_side else '—'}\n"
             f"{req.team_a} vs {req.team_b}\n"
             f"{reason_text}"
             f"{trap_tag}"
