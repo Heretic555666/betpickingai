@@ -293,20 +293,12 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         (now_utc - timedelta(days=1)).strftime("%Y%m%d"),
     ]
 
-    game_time = None
-    for ds in date_candidates:
-        game_time = get_nba_game_time(req.team_a, req.team_b, ds)
-        if game_time:
-            break
-
+    game_time = req.game_time  # trust build_model_inputs
 
     if not game_time:
-        print(
-            f"SKIP {game_id} | game detected upstream, "
-            f"but not actionable yet "
-            f"(dates tried: {date_candidates})"
-        )
+        print(f"SKIP {game_id} | missing game_time from inputs")
         return {"game": game_id, "markets": {}}
+
 
 
 
