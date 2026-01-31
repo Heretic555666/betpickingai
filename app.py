@@ -1080,10 +1080,9 @@ async def daily_auto_run():
                     )
 
                     result = await anyio.to_thread.run_sync(
-                        run_simulation,
-                        req,
-                        ignore_time_window=True
+                        lambda: run_simulation(req, ignore_time_window=True)
                     )
+
 
                     print("✅ Auto-run game complete:", result)
 
