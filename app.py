@@ -202,13 +202,13 @@ def confidence_score(edge, fair, line, pct):
 
 
 def confidence_tier(score):
-    if score >= 60:
+    if score >= 68:
         return "ELITE"
-    if score >= 50:
+    if score >= 62:
         return "VERY STRONG"
-    if score >= 40:
+    if score >= 57:
         return "STRONG"
-    if score >= 30:
+    if score >= 54:
         return "LEAN"
     return "NOISE"
 
@@ -221,9 +221,9 @@ def win_prob_tier(win_pct: float) -> str:
     Tier purely from win probability.
     Conservative by design.
     """
-    if win_pct >= 66:
+    if win_pct >= 68:
         return "ELITE"
-    if win_pct >= 61:
+    if win_pct >= 62:
         return "VERY STRONG"
     if win_pct >= 57:
         return "STRONG"
@@ -506,7 +506,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
             tier = win_prob_tier(win_pct)
 
-            if tier not in ("ELITE", "VERY STRONG", "STRONG","LEAN", "NO BET"):
+            if tier not in ("ELITE", "VERY STRONG", "STRONG"):
                 continue
 
 
@@ -644,8 +644,8 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # TOTALS SANITY FILTER (REMOVE COIN FLIPS)
         # -------------------------
 
-        #if abs(over_prob - 0.50) < 0.045:
-        #    continue
+        if abs(over_prob - 0.50) < 0.045:
+            continue
 
         bet_side = "OVER" if over_prob > under_prob else "UNDER"
        
@@ -657,11 +657,14 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
         edge = cap_edge(cal_over - implied_prob(market_odds))
         edge_pct_display = round(abs(edge) * 100, 2)
+        # HARD EDGE FLOOR (FINAL QUALITY GATE)
+        if edge_pct_display < 2.0:
+            continue
 
         # Edge explanation
-        if edge >= 0.015:
+        if edge >= 0.04:
             reasons.append("Strong model edge vs market price")
-        elif edge >= 0.015:
+        elif edge >= 0.025:
             reasons.append("Clear model edge vs market price")
         elif edge >= 0.015:
             reasons.append("Moderate pricing edge identified")
@@ -710,7 +713,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # =========================
         # DAILY ALERTS (NON-TIMING)
         # =========================
-        if ignore_time_window and tier in ("ELITE", "VERY STRONG", "STRONG", "LEAN", "NOISE"):
+        if ignore_time_window and tier in ("ELITE", "VERY STRONG", "STRONG"):
             daily_key = f"DAILY_{game_id}_{market}_{market_line}_{tier}"
 
             if daily_key not in DAILY_SENT_ALERTS:
@@ -737,6 +740,10 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             reasons.append(
                 "⚠️ Trap warning: market line shaded against model fair value"
             )
+        
+        # BLOCK TRAPS UNLESS ELITE
+        if trap_warning and tier != "ELITE":
+            continue
 
         # -------------------------
         # DIRECTIONAL EDGE REASONS
