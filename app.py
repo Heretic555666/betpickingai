@@ -117,17 +117,20 @@ def send_telegram_alert(
 
 SENT_ALERTS: set[str] = set()
 PREGAME_ALERTS: dict = {}
+DAILY_SENT_ALERTS: set[str] = set()
 
 ALERT_DAY = datetime.now(timezone.utc).date()
 
 
 def reset_alerts_if_new_day():
-    global ALERT_DAY, SENT_ALERTS
+    global ALERT_DAY, SENT_ALERTS, DAILY_SENT_ALERTS
     today = datetime.now(timezone.utc).date()
     if today != ALERT_DAY:
         SENT_ALERTS.clear()
+        DAILY_SENT_ALERTS.clear()
         ALERT_DAY = today
         print("🔄 Alert cache reset")
+
 
 
 # =========================================================
@@ -262,7 +265,7 @@ def allow_spread_bet(win_pct: float, tier: str) -> bool:
 # CORE SIMULATION LOGIC (single source of truth)
 # =========================================================
 
-def run_simulation(req: SimulationRequest):
+def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     rng = np.random.default_rng()
     reset_alerts_if_new_day()
 
@@ -316,15 +319,18 @@ def run_simulation(req: SimulationRequest):
     else:
         window = None
 
-    # Only allow final decision windows
-    if not (
-        20 <= minutes_to_tip <= 30 or   # early safety
-        9 <= minutes_to_tip <= 11 or    # 10-min
-        1 <= minutes_to_tip <= 3 or     # 2-min
-        -2 <= minutes_to_tip <= 0       # post-tip grace
-    ):
-        print(f"SKIP {game_id} | not in decision window ({minutes_to_tip:.1f} min)")
-        return {"game": game_id, "markets": {}}
+    
+    # Only allow final decision windows (unless daily scan)
+    if not ignore_time_window:
+        if not (
+            20 <= minutes_to_tip <= 30 or
+            9 <= minutes_to_tip <= 11 or
+            1 <= minutes_to_tip <= 3 or
+            -2 <= minutes_to_tip <= 0
+        ):
+            print(f"SKIP {game_id} | not in decision window ({minutes_to_tip:.1f} min)")
+            return {"game": game_id, "markets": {}}
+
 
     
     odds_map = fetch_nba_totals_odds()
@@ -650,6 +656,7 @@ def run_simulation(req: SimulationRequest):
             continue
 
         bet_side = "OVER" if over_prob > under_prob else "UNDER"
+       
         side_emoji = "⬆️" if bet_side == "OVER" else "⬇️"
         # -------------------------
         # BET REASONS (DISPLAY ONLY)
@@ -657,7 +664,8 @@ def run_simulation(req: SimulationRequest):
         reasons = []
 
         edge = cap_edge(cal_over - implied_prob(market_odds))
-        
+        edge_pct_display = round(abs(edge) * 100, 2)
+
         # Edge explanation
         if edge >= 0.06:
             reasons.append("Strong model edge vs market price")
@@ -697,6 +705,38 @@ def run_simulation(req: SimulationRequest):
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
         
+        market_label = {
+            "game": "🏀 FULL GAME TOTAL",
+            "q1": "⏱️ Q1 TOTAL",
+            "q2": "⏱️ Q2 TOTAL",
+            "q3": "⏱️ Q3 TOTAL",
+            "q4": "⏱️ Q4 TOTAL",
+            "spread": "📏 FULL GAME SPREAD",
+            "h2h": "💰 MONEYLINE",
+        }.get(market, market.upper())
+
+        # =========================
+        # DAILY ALERTS (NON-TIMING)
+        # =========================
+        if ignore_time_window and tier in ("ELITE", "VERY STRONG"):
+            daily_key = f"DAILY_{game_id}_{market}_{market_line}_{tier}"
+
+            if daily_key not in DAILY_SENT_ALERTS:
+                DAILY_SENT_ALERTS.add(daily_key)
+
+                daily_message = (
+                    f"📊 DAILY EDGE — {tier}\n"
+                    f"{market.upper()}\n\n"
+                    f"{req.team_a} vs {req.team_b}\n"
+                    f"📈 Line: {market_line}\n"
+                    f"🎯 Fair: {round(fair, 2)}\n"
+                    f"⚡ Edge: {edge_pct_display}%\n"
+                    f"🏆 Tier: {tier}\n\n"
+                    "⚠️ Daily scan only — wait for pregame confirmation."
+                )
+
+                send_telegram_alert(daily_message)
+
         # -------------------------
         # TRAP WARNING REASON
         # -------------------------
@@ -859,7 +899,7 @@ def run_simulation(req: SimulationRequest):
             f"✈️ Away Travel: {round(req.team_b_travel_km)} km\n"
             f"📈 Line: {market_line}\n"
             f"🎯 Fair: {round(fair, 2)}\n"
-            f"⚡ Edge: {round(edge * 100, 2)}%\n"
+            f"⚡ Edge: {edge_pct_display}%\n"
             f"🏆 Tier: {tier}\n"
             f"📊 Percentile: {pct}%\n"
             f"🏥 Injuries Included: YES\n"
@@ -973,7 +1013,7 @@ async def monitor_alive_heartbeat():
 # DAILY AUTO-RUN (FIXED)
 # =========================================================
 
-AUTO_RUN_TIME = "05:12"
+AUTO_RUN_TIME = "18:00"
 
 
 async def daily_auto_run():
@@ -981,7 +1021,7 @@ async def daily_auto_run():
     last_run_date = None
 
     while True:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         run_hour, run_minute = map(int, AUTO_RUN_TIME.split(":"))
         run_time = now.replace(
@@ -1039,12 +1079,15 @@ async def daily_auto_run():
                         team_b_b2b=g.get("team_b_b2b", False),
                     )
 
-                    result = await anyio.to_thread.run_sync(run_simulation, req)
+                    result = await anyio.to_thread.run_sync(
+                        run_simulation,
+                        req,
+                        ignore_time_window=True
+                    )
+
                     print("✅ Auto-run game complete:", result)
 
-            except Exception as e:
-                print("❌ Auto-run error:", e)
-
+            
                 last_run_date = now.date()
                 print("✅ Daily auto-run complete")
             except Exception as e:
