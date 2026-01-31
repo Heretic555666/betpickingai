@@ -202,13 +202,13 @@ def confidence_score(edge, fair, line, pct):
 
 
 def confidence_tier(score):
-    if score >= 70:
+    if score >= 60:
         return "ELITE"
-    if score >= 63:
+    if score >= 50:
         return "VERY STRONG"
-    if score >= 58:
+    if score >= 40:
         return "STRONG"
-    if score >= 54:
+    if score >= 30:
         return "LEAN"
     return "NOISE"
 
@@ -237,7 +237,7 @@ def win_prob_tier(win_pct: float) -> str:
 
 def allow_h2h_bet(win_pct: float, fair_odds: float, tier: str) -> bool:
     # block weak confidence
-    if tier in ("NO BET", "LEAN"):
+    if tier in ("NO BET"):
         return False
 
     # block heavy favorites (vig trap)
@@ -514,7 +514,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
             tier = win_prob_tier(win_pct)
 
-            if tier not in ("ELITE", "VERY STRONG", "STRONG"):
+            if tier not in ("ELITE", "VERY STRONG", "STRONG","LEAN", "NO BET"):
                 continue
 
 
@@ -652,8 +652,8 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # TOTALS SANITY FILTER (REMOVE COIN FLIPS)
         # -------------------------
 
-        if abs(over_prob - 0.50) < 0.045:
-            continue
+        #if abs(over_prob - 0.50) < 0.045:
+        #    continue
 
         bet_side = "OVER" if over_prob > under_prob else "UNDER"
        
@@ -667,11 +667,11 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         edge_pct_display = round(abs(edge) * 100, 2)
 
         # Edge explanation
-        if edge >= 0.06:
+        if edge >= 0.015:
             reasons.append("Strong model edge vs market price")
-        elif edge >= 0.04:
+        elif edge >= 0.015:
             reasons.append("Clear model edge vs market price")
-        elif edge >= 0.025:
+        elif edge >= 0.015:
             reasons.append("Moderate pricing edge identified")
         
         # -------------------------
@@ -718,7 +718,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # =========================
         # DAILY ALERTS (NON-TIMING)
         # =========================
-        if ignore_time_window and tier in ("ELITE", "VERY STRONG"):
+        if ignore_time_window and tier in ("ELITE", "VERY STRONG", "STRONG", "LEAN", "NOISE"):
             daily_key = f"DAILY_{game_id}_{market}_{market_line}_{tier}"
 
             if daily_key not in DAILY_SENT_ALERTS:
@@ -1013,7 +1013,7 @@ async def monitor_alive_heartbeat():
 # DAILY AUTO-RUN (FIXED)
 # =========================================================
 
-AUTO_RUN_TIME = "18:00"
+AUTO_RUN_TIME = "22:00"
 
 
 async def daily_auto_run():
