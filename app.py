@@ -1005,7 +1005,7 @@ async def monitor_alive_heartbeat():
 # DAILY AUTO-RUN (FIXED)
 # =========================================================
 
-AUTO_RUN_TIME = "22:15"
+AUTO_RUN_TIME = "22:36"
 
 
 async def daily_auto_run():
