@@ -516,6 +516,26 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             if not allow_spread_bet(win_pct, tier):
                 continue
 
+            # -------------------------
+            # SPREAD REASONS
+            # -------------------------
+            spread_reasons = [
+                f"Model projects {home_pct if pick_side=='HOME' else away_pct}% win probability",
+                f"Fair spread ({fair_spread}) differs meaningfully from expected margin",
+            ]
+
+            if variance_adjust >= 0.1:
+                spread_reasons.append("Higher variance profile increases edge confidence")
+
+            if pace_adjust <= -1.0:
+                spread_reasons.append("Slower pace favors margin stability")
+
+            reason_text = (
+                "🧠 Why this bet:\n"
+                + "\n".join(f"• {r}" for r in spread_reasons)
+                + "\n\n"
+            )
+
             # --------
             # TELEGRAM
             # --------
@@ -531,6 +551,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"📏 FULL GAME SPREAD — {tier}\n"
                     f"{pick_emoji} PICK: {pick_side}\n\n"
                     f"{req.team_a} vs {req.team_b}\n"
+                    f"{reason_text}"
                     f"📐 Fair Spread: {fair_spread}\n"
                     f"🏠 Home win %: {home_pct}%\n"
                     f"✈️ Away win %: {away_pct}%\n"
@@ -572,6 +593,26 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             pick_pct = max(home_pct, away_pct)
             pick_odds = fair_home if home_pct > away_pct else fair_away
 
+            # -------------------------
+            # MONEYLINE REASONS
+            # -------------------------
+            ml_reasons = [
+                f"Model win probability: {pick_pct}%",
+                f"Fair odds ({pick_odds}) imply value vs market pricing",
+            ]
+
+            if pick_pct >= 65:
+                ml_reasons.append("Strong projected win probability")
+
+            if variance_adjust < 0.2:
+                ml_reasons.append("Lower volatility favors straight outcome")
+
+            reason_text = (
+                "🧠 Why this bet:\n"
+                + "\n".join(f"• {r}" for r in ml_reasons)
+                + "\n\n"
+            )
+
             tier = win_prob_tier(pick_pct)
 
             if not allow_h2h_bet(pick_pct, pick_odds, tier):
@@ -586,6 +627,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"💰 MONEYLINE — {tier}\n"
                     f"🏆 PICK: {pick_team}\n\n"
                     f"{req.team_a} vs {req.team_b}\n"
+                    f"{reason_text}"
                     f"📊 Win Prob: {pick_pct}%\n"
                     f"📈 Fair Odds: {pick_odds}\n"
                     f"🏥 Injuries Included: YES\n"
@@ -886,7 +928,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # -------------------------
         # TELEGRAM MESSAGE
         # -------------------------
-
+       
         message = (
             f"{stage_emoji} {bet_stage} {market_label}\n"
             f"{side_emoji} PICK: {bet_side}\n\n"
