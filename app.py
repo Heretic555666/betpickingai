@@ -29,7 +29,7 @@ last_heartbeat_date = None
 
 load_dotenv()
 
-app = FastAPI(title="BetPicking AI MVP")
+app = FastAPI(title="ODDSFORGE MVP")
 app.include_router(nba_router)
 
 SIMULATIONS = 50_000
@@ -1025,7 +1025,7 @@ async def monitor_alive_heartbeat():
 
             if last_heartbeat_date != today:
                 send_telegram_alert(
-                    "BetPicking AI monitor alive\n"
+                    "ODDSFORGE monitor alive\n"
                     "Railway running | background tasks active | PC not required"
                 )
 
@@ -1171,7 +1171,7 @@ def test_telegram():
 def health_check():
     return {
         "status": "ok",
-        "service": "betpicking-ai",
+        "service": "ODDSFORGE",
         "time": datetime.now(timezone.utc).isoformat(),
     }
 
