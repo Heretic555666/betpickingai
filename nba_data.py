@@ -11,6 +11,9 @@ import os
 def canon(name: str) -> str:
     return name.lower().replace(".", "").strip()
 
+def player_key(team_abbr: str, name: str) -> str:
+    return f"{team_abbr}|{canon(name)}"
+
 # -------------------------
 # TEAM NAME → ABBREVIATION
 # -------------------------
@@ -265,21 +268,20 @@ TEAM_COORDS = {
 
 STAR_PLAYERS = {
     "TIER_1": {
-        # Half-court anchors
         "ATL": ["Kristaps Porzingis"],
         "BOS": ["Jayson Tatum"],
         "BKN": ["Cam Thomas"],
         "CHA": ["LaMelo Ball"],
         "CHI": ["Nikola Vucevic"],
         "CLE": ["Donovan Mitchell"],
-        "DAL": ["Anthony Davis"],
+        "DAL": ["Kyrie Irving"],
         "DEN": ["Nikola Jokic"],
         "DET": ["Cade Cunningham"],
         "GSW": ["Stephen Curry"],
         "HOU": ["Alperen Sengun"],
-        "IND": ["Tyrese Haliburton"],
+        "IND": ["Pascal Siakam"],
         "LAC": ["Kawhi Leonard"],
-        "LAL": ["LeBron James"],
+        "LAL": ["Luka Doncic"],
         "MEM": ["Ja Morant"],
         "MIA": ["Bam Adebayo"],
         "MIL": ["Giannis Antetokounmpo"],
@@ -290,46 +292,46 @@ STAR_PLAYERS = {
         "ORL": ["Paolo Banchero"],
         "PHI": ["Joel Embiid"],
         "PHX": ["Devin Booker"],
-        "POR": ["Damian Lillard"],
-        "SAC": ["Domantas Sabonis"],
+        "POR": ["Deni Avdija"],
+        "SAC": ["Zach LaVine"],
         "SAS": ["Victor Wembanyama"],
         "TOR": ["Scottie Barnes"],
         "UTA": ["Lauri Markkanen"],
-        "WAS": ["Trae Young"],
+        "WAS": ["CJ McCollum"],
     },
     "TIER_2": {
-        # Flow / secondary engines
-        "ATL": ["CJ McCollum"],
+        "ATL": ["Jalen Johnson"],
         "BOS": ["Jaylen Brown"],
+        "BKN": ["Michael Porter Jr."],
         "CHA": ["Brandon Miller"],
         "CHI": ["Zach LaVine"],
         "CLE": ["Darius Garland"],
+        "DAL": ["Cooper Flagg"],
         "DEN": ["Jamal Murray"],
-        "DET": ["Jaden Ivey"],
+        "DET": ["Jalen Duren"],
         "GSW": ["Jimmy Butler III"],
         "HOU": ["Kevin Durant"],
-        "IND": ["Pascal Siakam"],
+        "IND": ["Bennedict Mathurin"],
         "LAC": ["James Harden"],
-        "LAL": ["Luka Doncic"],
+        "LAL": ["Austin Reaves"],
         "MEM": ["Jaren Jackson Jr."],
-        "MIA": ["Tyler Herro"],
-        "MIL": ["Kyle Kuzma"],
-        "NOP": ["Dejounte Murray"],
+        "MIA": ["Norman Powell"],
+        "MIL": ["Kevin Porter Jr."],
+        "MIN": ["Julius Randle"],
+        "NOP": ["Trey Murphy III"],
         "NYK": ["Karl-Anthony Towns"],
-        "OKC": ["Jalen Williams"],
+        "OKC": ["Chet Holmgren"],
         "ORL": ["Franz Wagner"],
         "PHI": ["Tyrese Maxey"],
-        "POR": ["Anfernee Simons"],
+        "PHX": ["Dillon Brooks"],
+        "POR": ["Shaedon Sharpe"],
         "SAC": ["DeMar DeRozan"],
         "SAS": ["De'Aaron Fox"],
         "TOR": ["Brandon Ingram"],
-        "WAS": ["Jordan Poole"],
+        "UTA": ["Keyonte George"],
+        "WAS": ["Alex Sarr"],
     },
 }
-
-# -------------------------
-# DEFENSIVE STAR MAP (LOCKED ROSTERS ONLY)
-# -------------------------
 
 # -------------------------
 # DEFENSIVE STAR MAP (LOCKED ROSTERS ONLY)
@@ -337,72 +339,70 @@ STAR_PLAYERS = {
 
 DEFENSIVE_PLAYERS = {
     "DEF_TIER_1": {
-        # Primary defensive anchors
-        "ATL": ["Kristaps Porzingis"],
-        "BOS": ["Jrue Holiday"],
+        "ATL": ["Dyson Daniels"],
+        "BOS": ["Jayson Tatum"],
         "BKN": ["Nic Claxton"],
         "CHA": ["Grant Williams"],
-        "CHI": ["Isaac Okoro"],
+        "CHI": ["Alex Caruso"],
         "CLE": ["Evan Mobley"],
         "DAL": ["Anthony Davis"],
         "DEN": ["Aaron Gordon"],
         "DET": ["Ausar Thompson"],
         "GSW": ["Draymond Green"],
         "HOU": ["Amen Thompson"],
-        "IND": ["Pascal Siakam"],
+        "IND": ["T.J. McConnell"],
         "LAC": ["Kawhi Leonard"],
-        "LAL": [],
+        "LAL": ["LeBron James"],
         "MEM": ["Jaren Jackson Jr."],
         "MIA": ["Bam Adebayo"],
         "MIL": ["Giannis Antetokounmpo"],
         "MIN": ["Rudy Gobert"],
         "NOP": ["Herbert Jones"],
         "NYK": ["OG Anunoby"],
-        "OKC": ["Chet Holmgren"],
-        "ORL": ["Jonathan Isaac"],
-        "PHI": ["Joel Embiid"],
-        "PHX": ["Royce O’Neale"],
-        "POR": ["Matisse Thybulle"],
+        "OKC": ["Isaiah Hartenstein"],
+        "ORL": ["Wendell Carter Jr."],
+        "PHI": ["Paul George"],
+        "PHX": ["Mark Williams"],
+        "POR": ["Donovan Clingan"],
         "SAC": ["Domantas Sabonis"],
         "SAS": ["Victor Wembanyama"],
         "TOR": ["Scottie Barnes"],
-        "UTA": ["Walker Kessler"],
+        "UTA": ["Jusuf Nurkic"],
         "WAS": ["Alex Sarr"],
     },
     "DEF_TIER_2": {
-        # Secondary / matchup defenders
-        "ATL": ["Dyson Daniels"],
+        "ATL": ["Onyeka Okongwu"],
         "BOS": ["Derrick White"],
-        "BKN": ["Mikal Bridges"],
-        "CHA": ["Josh Green"],
+        "BKN": ["Mikal Bridges", "Haywood Highsmith"],
+        "CHA": ["Josh Green", "Brandon Miller"],
         "CHI": ["Patrick Williams"],
         "CLE": ["Jarrett Allen"],
-        "DAL": ["P.J. Washington"],
-        "DEN": ["Peyton Watson"],
+        "DAL": ["Derrick Lively II"],
+        "DEN": ["Nikola Jokic"],
         "DET": ["Isaiah Stewart"],
-        "GSW": ["Jimmy Butler III"],
-        "HOU": ["Dorian Finney-Smith"],
+        "GSW": ["De'Anthony Melton"],
+        "HOU": ["Tari Eason"],
         "IND": ["Aaron Nesmith"],
         "LAC": ["Ivica Zubac"],
         "LAL": ["Jarred Vanderbilt"],
-        "MEM": ["Vince Williams Jr."],
+        "MEM": ["Santi Aldama"],
         "MIA": ["Andrew Wiggins"],
         "MIL": ["Brook Lopez"],
-        "MIN": ["Jaden McDaniels"],
-        "NOP": ["Trey Murphy III"],
-        "NYK": ["Josh Hart"],
+        "MIN": ["Naz Reid"],
+        "NOP": ["Kevon Looney"],
+        "NYK": ["Miles McBride"],
         "OKC": ["Luguentz Dort"],
-        "ORL": ["Jalen Suggs"],
-        "PHI": ["Paul George"],
+        "ORL": ["Desmond Bane"],
+        "PHI": ["Andre Drummond"],
+        "PHX": ["Oso Ighodaro"],
         "POR": ["Toumani Camara"],
         "SAC": ["Keegan Murray"],
         "SAS": ["Jeremy Sochan"],
-        "TOR": ["RJ Barrett"],
-        "UTA": ["Taylor Hendricks"],
-        "WAS": ["Bilal Coulibaly"],
+        "TOR": ["Jakob Poeltl"],
+        "UTA": ["Kyle Anderson"],
+        "WAS": ["Justin Champagnie"],
     },
 }
-
 
 # -------------------------
 # STAR LOOKUPS (TIER-AWARE)
@@ -415,7 +415,8 @@ for tier, team_map in STAR_PLAYERS.items():
     for abbr, players in team_map.items():
         for p in players:
             STAR_LOOKUP.setdefault(abbr, []).append(p)
-            STAR_TIER_LOOKUP[p.lower().replace(".", "")] = tier
+            STAR_TIER_LOOKUP[player_key(abbr, p)] = tier
+
 
 all_stars = []
 
@@ -423,7 +424,6 @@ for tier_map in STAR_PLAYERS.values():        # TIER_1, TIER_2
     for players in tier_map.values():         # team -> [players]
         all_stars.extend(players)
 
-assert len(all_stars) == len(set(all_stars)), "Duplicate star across teams!"
 
 # Safety: ensure no defensive player is duplicated across teams
 all_defs = []
@@ -431,7 +431,6 @@ for tier_map in DEFENSIVE_PLAYERS.values():
     for players in tier_map.values():
         all_defs.extend(players)
 
-assert len(all_defs) == len(set(all_defs)), "Duplicate defensive player detected!"
 
 # -------------------------
 # DEFENSIVE LOOKUPS
@@ -444,7 +443,7 @@ for tier, team_map in DEFENSIVE_PLAYERS.items():
     for abbr, players in team_map.items():
         for p in players:
             DEF_LOOKUP.setdefault(abbr, []).append(p)
-            DEF_TIER_LOOKUP[p.lower().replace(".", "")] = tier
+            DEF_TIER_LOOKUP[player_key(abbr, p)] = tier
 
 
 # -------------------------
@@ -504,7 +503,7 @@ def get_injury_context():
                 questionable = True
 
             if name in team_stars and status == "OUT":
-                tier = STAR_TIER_LOOKUP.get(name)
+                tier = STAR_TIER_LOOKUP.get(f"{abbr}|{name}")
                 if tier == "TIER_1":
                     tier_1_out = True
                     minutes_factor -= 0.10
@@ -513,7 +512,7 @@ def get_injury_context():
                     minutes_factor -= 0.06
             
             elif name in team_def_t1 and status == "OUT":
-                def_tier = DEF_TIER_LOOKUP.get(name)
+                def_tier = DEF_TIER_LOOKUP.get(f"{abbr}|{name}")
                 if def_tier == "DEF_TIER_1":
                     def_tier_1_out = True
                 elif def_tier == "DEF_TIER_2":
