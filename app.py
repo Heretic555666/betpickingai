@@ -953,16 +953,19 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # SEND / QUEUE ALERT
         # -------------------------
 
-        # ❌ EARLY alerts disabled to reduce usage
-        if key not in PREGAME_ALERTS:
-            PREGAME_ALERTS[key] = {
-                "game_time": req.game_time,
-                "message": message,
-                "home_abbr": home_abbr,
-                "away_abbr": away_abbr,
-                "sent_10": False,
-                "sent_2": False,
-            }
+        # ONLY queue alerts for 2-minute window
+        minutes_to_tip = (req.game_time - datetime.now(timezone.utc)).total_seconds() / 60
+
+        if 1 <= minutes_to_tip <= 3:
+            if key not in PREGAME_ALERTS:
+                PREGAME_ALERTS[key] = {
+                    "game_time": req.game_time,
+                    "message": message,
+                    "home_abbr": home_abbr,
+                    "away_abbr": away_abbr,
+                    "sent_10": True,   # force-disable 10-min
+                    "sent_2": False,
+                }
 
 
     return {"game": game_id, "markets": results}
@@ -988,23 +991,6 @@ async def pregame_alert_scheduler():
 
         for key, alert in list(PREGAME_ALERTS.items()):
             game_time = alert["game_time"]
-
-            # 🔔 10-minute alert
-            if not alert.get("sent_10") and now >= game_time - timedelta(minutes=10):
-                confirmed = lineups_confirmed(
-                    game_time_utc=alert["game_time"],
-                    injury_map=get_injury_context(),
-                    home=alert["home_abbr"],
-                    away=alert["away_abbr"],
-            )
-
-                    
-                
-                prefix = "⏰ 10 MIN 🏀 FULL GAME TOTAL\n"
-                prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
-                msg = alert["message"].replace("📢 EARLY", "⏰ 10 MIN")
-                send_telegram_alert(prefix + msg)
-                alert["sent_10"] = True
 
             # 🚨 2-minute alert
             if not alert.get("sent_2") and now >= game_time - timedelta(minutes=2):
@@ -1174,7 +1160,6 @@ async def live_game_monitor():
 async def startup():
     asyncio.create_task(pregame_alert_scheduler())
     asyncio.create_task(daily_auto_run())
-    asyncio.create_task(live_game_monitor())
     asyncio.create_task(monitor_alive_heartbeat())
 
 @app.get("/test/telegram")
