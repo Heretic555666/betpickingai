@@ -1003,7 +1003,7 @@ async def pregame_alert_scheduler():
         for key, alert in list(PREGAME_ALERTS.items()):
             game_time = alert["game_time"]
 
-            # 🚨 2-minute alert
+            # 🚨 5-minute alert
             if not alert.get("sent_5") and now >= game_time - timedelta(minutes=5):
                 confirmed = lineups_confirmed(
                     game_time_utc=alert["game_time"],
