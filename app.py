@@ -315,7 +315,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     # Only allow final decision windows (unless daily scan)
     if not ignore_time_window:
         if not (
-            20 <= minutes_to_tip <= 30 or
+            15 <= minutes_to_tip <= 30 or
             9 <= minutes_to_tip <= 11 or
             1 <= minutes_to_tip <= 3 or
             -2 <= minutes_to_tip <= 0
@@ -412,6 +412,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     # INJURY CONTEXT (TIER-AWARE)
     # -------------------------
 
+    
     injury_map = get_injury_context()
 
     home_ctx = injury_map.get(home_abbr, {})
@@ -448,12 +449,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         if ctx.get("def_tier_2_out"):
             def_totals_adjust += abs(DEF_TOTALS_IMPACT["DEF_TIER_2"])
 
-    # Defensive context explanation
-    if home_ctx.get("def_tier_1_out") or away_ctx.get("def_tier_1_out"):
-        reasons.append("Elite defender absence increases scoring efficiency")
-    elif home_ctx.get("def_tier_2_out") or away_ctx.get("def_tier_2_out"):
-        reasons.append("Key defensive absence slightly boosts offensive output")
-
+    
     # -------------------------
     # DEFENSIVE SPREAD VARIANCE ADJUST (VARIANCE ONLY)
     # -------------------------
@@ -700,6 +696,12 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # -------------------------
         reasons = []
 
+        # Defensive context explanation (totals only)
+        if home_ctx.get("def_tier_1_out") or away_ctx.get("def_tier_1_out"):
+            reasons.append("Elite defender absence increases scoring efficiency")
+        elif home_ctx.get("def_tier_2_out") or away_ctx.get("def_tier_2_out"):
+            reasons.append("Key defensive absence slightly boosts offensive output")
+
         edge = cap_edge(cal_over - implied_prob(market_odds))
         edge_pct_display = round(abs(edge) * 100, 2)
         # HARD EDGE FLOOR (FINAL QUALITY GATE)
@@ -864,10 +866,11 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
         confirmed = lineups_confirmed(
             game_time_utc=req.game_time,
-            injury_map=get_injury_context(),
+            injury_map=injury_map,
             home=home_abbr,
             away=away_abbr,
         )
+
 
         bet_stage = "CONFIRMED" if confirmed else "EARLY"
         stage_emoji = "🔥" if confirmed else "📢"
@@ -876,8 +879,16 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # -------------------------
         # DEDUPLICATION KEY
         # -------------------------
+        
+        # Injury fingerprint (forces alert if injury context changes)
+        injury_signature = (
+            f"{home_ctx.get('tier_1_out')}_"
+            f"{away_ctx.get('tier_1_out')}_"
+            f"{home_ctx.get('def_tier_1_out')}_"
+            f"{away_ctx.get('def_tier_1_out')}"
+        )
 
-        key = f"{game_id}_{market}_{market_line}_{bet_stage}"
+        key = f"{game_id}_{market}_{market_line}_{bet_stage}_{injury_signature}"
 
         if key in SENT_ALERTS:
             print("DEDUPED:", key)
@@ -949,7 +960,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             f"🏥 Injuries Included: YES\n"
         )
 
-                # -------------------------
+        # -------------------------
         # SEND / QUEUE ALERT
         # -------------------------
 
@@ -963,7 +974,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     "message": message,
                     "home_abbr": home_abbr,
                     "away_abbr": away_abbr,
-                    "sent_10": True,   # force-disable 10-min
+                    "sent_10": False,   # force-disable 10-min
                     "sent_2": False,
                 }
 
