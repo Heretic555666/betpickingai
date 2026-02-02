@@ -417,6 +417,34 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
     home_ctx = injury_map.get(home_abbr, {})
     away_ctx = injury_map.get(away_abbr, {})
+    
+    # -------------------------
+    # TIERED PLAYER OUT DISPLAY (DISPLAY ONLY)
+    # -------------------------
+
+    out_players = []
+
+    def collect_out_players(team_abbr, ctx):
+        for p in ctx.get("tier_1_players_out", []):
+            out_players.append(f"{team_abbr}: {p} (TIER 1)")
+        for p in ctx.get("tier_2_players_out", []):
+            out_players.append(f"{team_abbr}: {p} (TIER 2)")
+        for p in ctx.get("def_tier_1_players_out", []):
+            out_players.append(f"{team_abbr}: {p} (DEF TIER 1)")
+        for p in ctx.get("def_tier_2_players_out", []):
+            out_players.append(f"{team_abbr}: {p} (DEF TIER 2)")
+
+    collect_out_players(home_abbr, home_ctx)
+    collect_out_players(away_abbr, away_ctx)
+
+    injury_player_text = ""
+    if out_players:
+        injury_player_text = (
+            "🏥 Key players OUT:\n"
+            + "\n".join(f"• {p}" for p in out_players)
+            + "\n\n"
+        )
+
 
     pace_adjust = 0.0
     variance_adjust = 0.0
@@ -546,6 +574,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             if key not in SENT_ALERTS:
                 SENT_ALERTS.add(key)
 
+            
                 message = (
                     f"📏 FULL GAME SPREAD — {tier}\n"
                     f"{pick_emoji} PICK: {bet_side}\n\n"
@@ -883,10 +912,15 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # Injury fingerprint (forces alert if injury context changes)
         injury_signature = (
             f"{home_ctx.get('tier_1_out')}_"
+            f"{home_ctx.get('tier_2_out')}_"
             f"{away_ctx.get('tier_1_out')}_"
+            f"{away_ctx.get('tier_2_out')}_"
             f"{home_ctx.get('def_tier_1_out')}_"
-            f"{away_ctx.get('def_tier_1_out')}"
+            f"{home_ctx.get('def_tier_2_out')}_"
+            f"{away_ctx.get('def_tier_1_out')}_"
+            f"{away_ctx.get('def_tier_2_out')}"
         )
+
 
         key = f"{game_id}_{market}_{market_line}_{bet_stage}_{injury_signature}"
 
@@ -947,6 +981,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             f"{stage_emoji} {bet_stage} {market_label}\n"
             f"{side_emoji} PICK: {bet_side if bet_side else '—'}\n"
             f"{req.team_a} vs {req.team_b}\n"
+            f"{injury_player_text}"
             f"{reason_text}"
             f"{trap_tag}"
             f"{def_tag}"
