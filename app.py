@@ -964,10 +964,10 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # SEND / QUEUE ALERT
         # -------------------------
 
-        # ONLY queue alerts for 2-minute window
+        # ONLY queue alerts for 5-minute window
         minutes_to_tip = (req.game_time - datetime.now(timezone.utc)).total_seconds() / 60
 
-        if 1 <= minutes_to_tip <= 3:
+        if 3 <= minutes_to_tip <= 6:
             if key not in PREGAME_ALERTS:
                 PREGAME_ALERTS[key] = {
                     "game_time": req.game_time,
@@ -975,7 +975,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     "home_abbr": home_abbr,
                     "away_abbr": away_abbr,
                     "sent_10": False,   # force-disable 10-min
-                    "sent_2": False,
+                    "sent_5": False,
                 }
 
 
@@ -1004,7 +1004,7 @@ async def pregame_alert_scheduler():
             game_time = alert["game_time"]
 
             # 🚨 2-minute alert
-            if not alert.get("sent_2") and now >= game_time - timedelta(minutes=2):
+            if not alert.get("sent_5") and now >= game_time - timedelta(minutes=5):
                 confirmed = lineups_confirmed(
                     game_time_utc=alert["game_time"],
                     injury_map=get_injury_context(),
@@ -1012,11 +1012,11 @@ async def pregame_alert_scheduler():
                     away=alert["away_abbr"],
             )
 
-                prefix = "🚨 2 MIN 🏀 FULL GAME TOTAL\n"
+                prefix = "🚨 5 MIN 🏀 FULL GAME TOTAL\n"
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
-                msg = alert["message"].replace("📢 EARLY", "🚨 2 MIN")
+                msg = alert["message"].replace("📢 EARLY", "🚨 5 MIN")
                 send_telegram_alert(prefix + msg)
-                alert["sent_2"] = True
+                alert["sent_5"] = True
 
         await asyncio.sleep(60)
 
