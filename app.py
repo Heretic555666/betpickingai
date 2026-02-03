@@ -416,6 +416,36 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     home_ctx = injury_map.get(home_abbr, {})
     away_ctx = injury_map.get(away_abbr, {})
     
+    def format_injury_list(team_abbr, ctx):
+        out_players = (
+            ctx.get("tier_1_players_out", [])
+            + ctx.get("tier_2_players_out", [])
+            + ctx.get("def_tier_1_players_out", [])
+            + ctx.get("def_tier_2_players_out", [])
+        )
+
+        gtd_players = ctx.get("questionable_players", [])
+
+        lines = []
+
+        if out_players:
+            lines.append(f"{team_abbr} OUT: " + ", ".join(out_players))
+        else:
+            lines.append(f"{team_abbr} OUT: —")
+
+        if gtd_players:
+            lines.append(f"{team_abbr} GTD: " + ", ".join(gtd_players))
+        else:
+            lines.append(f"{team_abbr} GTD: —")
+
+        return "\n".join(lines)
+
+    injury_report_text = (
+        format_injury_list(home_abbr, home_ctx)
+        + "\n"
+        + format_injury_list(away_abbr, away_ctx)
+    )
+
     injuries_confirmed = not (
         home_ctx.get("questionable") or home_ctx.get("doubtful") or
         away_ctx.get("questionable") or away_ctx.get("doubtful")
@@ -590,6 +620,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"🏠 Home win %: {home_pct}%\n"
                     f"✈️ Away win %: {away_pct}%\n"
                     f"🏥 Injuries Included: {injury_status_text}\n"
+                    f"\n🏥 Injury Report\n{injury_report_text}\n"
                 )
 
                 send_telegram_alert(
@@ -665,6 +696,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"📊 Win Prob: {pick_pct}%\n"
                     f"📈 Fair Odds: {pick_odds}\n"
                     f"🏥 Injuries Included: {injury_status_text}\n"
+                    f"\n🏥 Injury Report\n{injury_report_text}\n"
                 )
 
                 send_telegram_alert(
@@ -999,6 +1031,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             f"🏆 Tier: {tier}\n"
             f"📊 Percentile: {pct}%\n"
             f"🏥 Injuries Included: {injury_status_text}\n"
+            f"\n🏥 Injury Report\n{injury_report_text}\n"
         )
 
         # -------------------------

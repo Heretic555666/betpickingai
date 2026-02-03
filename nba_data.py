@@ -489,7 +489,8 @@ def get_injury_context():
 
         questionable = False
         doubtful = False
-        
+        questionable_players = []
+
         tier_1_players_out = []
         tier_2_players_out = []
         def_tier_1_players_out = []
@@ -506,6 +507,8 @@ def get_injury_context():
 
             if status == "QUESTIONABLE":
                 questionable = True
+                questionable_players.append(p.get("playerName"))
+
 
             if name in team_stars and status == "OUT":
                 tier = STAR_TIER_LOOKUP.get(f"{abbr}|{name}")
@@ -540,6 +543,7 @@ def get_injury_context():
             "def_tier_2_out": def_tier_2_out,
             "questionable": questionable,
             "doubtful": doubtful,
+            "questionable_players": questionable_players,
             "minutes_factor": round(max(minutes_factor, 0.85), 2),
             "tier_1_players_out": tier_1_players_out,
             "tier_2_players_out": tier_2_players_out,
