@@ -411,13 +411,18 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     # -------------------------
     # INJURY CONTEXT (TIER-AWARE)
     # -------------------------
-
-    
     injury_map = get_injury_context()
 
     home_ctx = injury_map.get(home_abbr, {})
     away_ctx = injury_map.get(away_abbr, {})
     
+    injuries_confirmed = not (
+        home_ctx.get("questionable") or home_ctx.get("doubtful") or
+        away_ctx.get("questionable") or away_ctx.get("doubtful")
+    )
+
+    injury_status_text = "YES" if injuries_confirmed else "PENDING (GTD)"
+
     # -------------------------
     # TIERED PLAYER OUT DISPLAY (DISPLAY ONLY)
     # -------------------------
@@ -566,6 +571,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             # TELEGRAM
             # --------
             bet_side = "HOME" if home_pct > away_pct else "AWAY"
+            pick_team_name = req.team_a if bet_side == "HOME" else req.team_b
 
             pick_emoji = "🏠" if bet_side == "HOME" else "✈️"
 
@@ -577,13 +583,13 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             
                 message = (
                     f"📏 FULL GAME SPREAD — {tier}\n"
-                    f"{pick_emoji} PICK: {bet_side}\n\n"
+                    f"{pick_emoji} PICK: {pick_team_name} ({bet_side})\n\n"
                     f"{req.team_a} vs {req.team_b}\n"
                     f"{reason_text}"
                     f"📐 Fair Spread: {fair_spread}\n"
                     f"🏠 Home win %: {home_pct}%\n"
                     f"✈️ Away win %: {away_pct}%\n"
-                    f"🏥 Injuries Included: YES\n"
+                    f"🏥 Injuries Included: {injury_status_text}\n"
                 )
 
                 send_telegram_alert(
@@ -658,7 +664,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"{reason_text}"
                     f"📊 Win Prob: {pick_pct}%\n"
                     f"📈 Fair Odds: {pick_odds}\n"
-                    f"🏥 Injuries Included: YES\n"
+                    f"🏥 Injuries Included: {injury_status_text}\n"
                 )
 
                 send_telegram_alert(
@@ -992,7 +998,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             f"⚡ Edge: {edge_pct_display}%\n"
             f"🏆 Tier: {tier}\n"
             f"📊 Percentile: {pct}%\n"
-            f"🏥 Injuries Included: YES\n"
+            f"🏥 Injuries Included: {injury_status_text}\n"
         )
 
         # -------------------------
@@ -1002,7 +1008,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # ONLY queue alerts for 5-minute window
         minutes_to_tip = (req.game_time - datetime.now(timezone.utc)).total_seconds() / 60
 
-        if 3 <= minutes_to_tip <= 6:
+        if 1 <= minutes_to_tip <= 10:
             if key not in PREGAME_ALERTS:
                 PREGAME_ALERTS[key] = {
                     "game_time": req.game_time,
