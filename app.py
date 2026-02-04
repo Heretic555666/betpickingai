@@ -248,6 +248,10 @@ def allow_h2h_bet(win_pct: float, fair_odds: float, tier: str) -> bool:
     if win_pct < 52:
         return False
 
+    # Block weak underdogs unless elite
+    if fair_odds >= 2.30 and tier != "ELITE":
+        return False
+
     return True
 
 
@@ -447,9 +451,10 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     )
 
     injuries_confirmed = not (
-        home_ctx.get("questionable") or home_ctx.get("doubtful") or
-        away_ctx.get("questionable") or away_ctx.get("doubtful")
+        home_ctx.get("questionable_players") or
+        away_ctx.get("questionable_players")
     )
+
 
     injury_status_text = "YES" if injuries_confirmed else "PENDING (GTD)"
 
@@ -473,12 +478,21 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     collect_out_players(away_abbr, away_ctx)
 
     injury_player_text = ""
-    if out_players:
-        injury_player_text = (
-            "🏥 Key players OUT:\n"
-            + "\n".join(f"• {p}" for p in out_players)
-            + "\n\n"
-        )
+
+    if out_players or home_ctx.get("questionable_players") or away_ctx.get("questionable_players"):
+        injury_player_text = "🏥 Injury context:\n"
+
+        for p in out_players:
+            injury_player_text += f"• {p}\n"
+
+        for p in home_ctx.get("questionable_players", []):
+            injury_player_text += f"• {home_abbr}: {p} (GTD)\n"
+
+        for p in away_ctx.get("questionable_players", []):
+            injury_player_text += f"• {away_abbr}: {p} (GTD)\n"
+
+        injury_player_text += "\n"
+
 
 
     pace_adjust = 0.0
@@ -1038,10 +1052,8 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # SEND / QUEUE ALERT
         # -------------------------
 
-        # ONLY queue alerts for 5-minute window
-        minutes_to_tip = (req.game_time - datetime.now(timezone.utc)).total_seconds() / 60
-
-        if 1 <= minutes_to_tip <= 10:
+        # Queue pregame alert if within 15 minutes (send still handled by scheduler)
+        if 1 <= minutes_to_tip <= 15:
             if key not in PREGAME_ALERTS:
                 PREGAME_ALERTS[key] = {
                     "game_time": req.game_time,
