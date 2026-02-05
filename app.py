@@ -456,7 +456,17 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     )
 
 
-    injury_status_text = "YES" if injuries_confirmed else "PENDING (GTD)"
+    injury_status_text = (
+        "CONFIRMED"
+        if lineups_confirmed(
+            game_time_utc=req.game_time,
+            injury_map=injury_map,
+            home=home_abbr,
+            away=away_abbr,
+        )
+        else "PENDING (GTD)"
+    )
+
 
     # -------------------------
     # TIERED PLAYER OUT DISPLAY (DISPLAY ONLY)
@@ -857,6 +867,10 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"🏆 Tier: {tier}\n\n"
                     "⚠️ Daily scan only — wait for pregame confirmation."
                 )
+            
+            # OPTIONAL: include injury names in daily alerts (OFF by default)
+            if os.getenv("SHOW_INJURIES_IN_DAILY") == "true":
+                daily_message += f"\n🏥 Injury Report\n{injury_report_text}\n"
 
                 send_telegram_alert(daily_message)
 
@@ -1258,6 +1272,8 @@ async def startup():
     asyncio.create_task(pregame_alert_scheduler())
     asyncio.create_task(daily_auto_run())
     asyncio.create_task(monitor_alive_heartbeat())
+    asyncio.create_task(live_game_monitor())  # ✅ REQUIRED
+
 
 @app.get("/test/telegram")
 def test_telegram():
