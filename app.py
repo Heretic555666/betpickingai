@@ -312,7 +312,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
     # PREQUEUE PREGAME ALERT (FIX 1)
     # -------------------------------------------------
     if 1 <= minutes_to_tip <= 15:
-        pregame_key = f"{game_id}_{market}_PREGAME"
+        pregame_key = f"{game_id}_GAME_PREGAME"
 
         if pregame_key not in PREGAME_ALERTS:
             PREGAME_ALERTS[pregame_key] = {
@@ -1116,6 +1116,9 @@ async def pregame_alert_scheduler():
 
             # 🚨 5-minute alert
             if not alert.get("sent_5") and now >= game_time - timedelta(minutes=10):
+                if alert["message"] is None:
+                    continue
+                    
                 confirmed = lineups_confirmed(
                     game_time_utc=alert["game_time"],
                     injury_map=get_injury_context(),
