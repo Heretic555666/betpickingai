@@ -308,6 +308,23 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
     minutes_to_tip = (game_time - now).total_seconds() / 60
 
+    # -------------------------------------------------
+    # PREQUEUE PREGAME ALERT (FIX 1)
+    # -------------------------------------------------
+    if 1 <= minutes_to_tip <= 15:
+        pregame_key = f"{game_id}_{market}_PREGAME"
+
+        if pregame_key not in PREGAME_ALERTS:
+            PREGAME_ALERTS[pregame_key] = {
+                "game_time": req.game_time,
+                "message": None,   # filled later
+                "home_abbr": home_abbr,
+                "away_abbr": away_abbr,
+                "sent_10": False,
+                "sent_5": False,
+            }
+
+
     if 9 <= minutes_to_tip <= 11:
         window = "10m"
     elif 1 <= minutes_to_tip <= 3:
@@ -988,7 +1005,8 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         )
 
 
-        key = f"{game_id}_{market}_{market_line}_{bet_stage}_{injury_signature}"
+        key = f"{game_id}_{market}_{market_line}_{bet_stage}_{injury_signature}_PREGAME"
+
 
         if key in SENT_ALERTS:
             print("DEDUPED:", key)
@@ -1061,24 +1079,17 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             f"🏥 Injuries Included: {injury_status_text}\n"
             f"\n🏥 Injury Report\n{injury_report_text}\n"
         )
+        
+        # Attach message to pregame alert if queued
+        pregame_key = f"{game_id}_{market}_PREGAME"
+        if pregame_key in PREGAME_ALERTS and PREGAME_ALERTS[pregame_key]["message"] is None:
+            PREGAME_ALERTS[pregame_key]["message"] = message
 
         # -------------------------
         # SEND / QUEUE ALERT
         # -------------------------
 
-        # Queue pregame alert if within 15 minutes (send still handled by scheduler)
-        if 1 <= minutes_to_tip <= 15:
-            if key not in PREGAME_ALERTS:
-                PREGAME_ALERTS[key] = {
-                    "game_time": req.game_time,
-                    "message": message,
-                    "home_abbr": home_abbr,
-                    "away_abbr": away_abbr,
-                    "sent_10": False,   # force-disable 10-min
-                    "sent_5": False,
-                }
-
-
+        
     return {"game": game_id, "markets": results}
 
 
@@ -1104,7 +1115,7 @@ async def pregame_alert_scheduler():
             game_time = alert["game_time"]
 
             # 🚨 5-minute alert
-            if not alert.get("sent_5") and now >= game_time - timedelta(minutes=5):
+            if not alert.get("sent_5") and now >= game_time - timedelta(minutes=10):
                 confirmed = lineups_confirmed(
                     game_time_utc=alert["game_time"],
                     injury_map=get_injury_context(),
@@ -1116,6 +1127,11 @@ async def pregame_alert_scheduler():
                 prefix += "✅ Lineups confirmed\n\n" if confirmed else "⏳ Lineups pending\n\n"
                 msg = alert["message"].replace("📢 EARLY", "🚨 5 MIN")
                 send_telegram_alert(prefix + msg)
+                alert["sent_5"] = True
+            
+            # FAILSAFE: send if game starts and alert not sent
+            if not alert.get("sent_5") and now >= game_time:
+                send_telegram_alert("🚨 LATE PREGAME ALERT\n\n" + alert["message"])
                 alert["sent_5"] = True
 
         await asyncio.sleep(60)
