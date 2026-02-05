@@ -1081,7 +1081,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         )
         
         # Attach message to pregame alert if queued
-        pregame_key = f"{game_id}_{market}_PREGAME"
+        pregame_key = f"{game_id}_GAME_PREGAME"
         if pregame_key in PREGAME_ALERTS and PREGAME_ALERTS[pregame_key]["message"] is None:
             PREGAME_ALERTS[pregame_key]["message"] = message
 
@@ -1118,7 +1118,7 @@ async def pregame_alert_scheduler():
             if not alert.get("sent_5") and now >= game_time - timedelta(minutes=10):
                 if alert["message"] is None:
                     continue
-                    
+
                 confirmed = lineups_confirmed(
                     game_time_utc=alert["game_time"],
                     injury_map=get_injury_context(),
@@ -1134,6 +1134,8 @@ async def pregame_alert_scheduler():
             
             # FAILSAFE: send if game starts and alert not sent
             if not alert.get("sent_5") and now >= game_time:
+                if alert["message"] is None:
+                    continue
                 send_telegram_alert("🚨 LATE PREGAME ALERT\n\n" + alert["message"])
                 alert["sent_5"] = True
 
