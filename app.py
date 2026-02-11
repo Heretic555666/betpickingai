@@ -37,6 +37,13 @@ DEFAULT_BANKROLL = 1000
 
 AEST = timezone(timedelta(hours=10))
 
+# =========================================================
+# ELITE MODE TOGGLE
+# =========================================================
+
+ELITE_MODE = True   # True = only ELITE alerts
+                    # False = allow all normal tiers
+
 # -------------------------
 # STAR TIER PACE MODIFIERS
 # -------------------------
@@ -202,15 +209,25 @@ def confidence_score(edge, fair, line, pct):
 
 
 def confidence_tier(score):
-    if score >= 72:
+    if score >= 80:
         return "ELITE"
-    if score >= 67:
+    if score >= 75:
         return "VERY STRONG"
-    if score >= 60:
+    if score >= 70:
         return "STRONG"
-    if score >= 56:
+    if score >= 60:
         return "LEAN"
     return "NOISE"
+
+# =========================================================
+# ALERT TIER FILTER
+# =========================================================
+
+def allow_alert_for_tier(tier: str) -> bool:
+    if ELITE_MODE:
+        return tier == "ELITE"
+    return tier in ("ELITE", "VERY STRONG", "STRONG")
+  
 
 # =========================================================
 # SPREAD / H2H TIERS
@@ -607,10 +624,10 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
 
             tier = win_prob_tier(win_pct)
 
-            if tier not in ("ELITE", "VERY STRONG"):
+            if not allow_alert_for_tier(tier):
                 continue
 
-
+            
             # --------
             # FILTERS
             # --------
@@ -722,6 +739,9 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             tier = win_prob_tier(pick_pct)
 
             if not allow_h2h_bet(pick_pct, pick_odds, tier):
+                continue
+            
+            if not allow_alert_for_tier(tier):
                 continue
 
             key = f"{game_id}_h2h_{pick_pct}_{tier}"
@@ -855,6 +875,9 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         tier = confidence_tier(confidence_score(edge, fair, market_line, pct))
         signal = lean_signal(edge, pct)
         
+        if not allow_alert_for_tier(tier):
+            continue
+
         market_label = {
             "game": "🏀 FULL GAME TOTAL",
             "q1": "⏱️ Q1 TOTAL",
@@ -868,7 +891,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
         # =========================
         # DAILY ALERTS (NON-TIMING)
         # =========================
-        if ignore_time_window and tier in ("ELITE", "VERY STRONG"):
+        if ignore_time_window and allow_alert_for_tier(tier):
             daily_key = f"DAILY_{game_id}_{market}_{market_line}_{tier}"
 
             if daily_key not in DAILY_SENT_ALERTS:
@@ -945,6 +968,9 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     "STRONG": "VERY STRONG",
                     "VERY STRONG": "ELITE",
                 }.get(tier, tier)
+
+        if not allow_alert_for_tier(tier):
+            continue
 
         results[market] = {
             "line": market_line,
