@@ -36,3 +36,44 @@ def fetch_nba_totals():
     except ValueError:
         print("Invalid JSON response")
         return None
+
+def get_mlb_totals(api_key: str):
+    """
+    Fetch MLB totals from Odds API.
+    SAFE: manual call only.
+    """
+
+    import requests
+
+    url = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds"
+
+    params = {
+        "apiKey": api_key,
+        "regions": "us",
+        "markets": "totals",
+        "oddsFormat": "decimal",
+    }
+
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+
+    games = r.json()
+    results = []
+
+    for game in games:
+        home = game["home_team"]
+        away = game["away_team"]
+
+        for book in game["bookmakers"]:
+            for market in book["markets"]:
+                if market["key"] == "totals":
+                    for outcome in market["outcomes"]:
+                        if outcome["name"] == "Over":
+                            results.append({
+                                "home": home,
+                                "away": away,
+                                "total": outcome["point"],
+                                "book": book["title"]
+                            })
+
+    return results

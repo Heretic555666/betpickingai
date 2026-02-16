@@ -7,6 +7,8 @@ import requests
 import os
 import anyio
 
+ENABLE_MLB = os.getenv("ENABLE_MLB", "false").lower() == "true"
+
 from dotenv import load_dotenv
 
 from nba_data import (
@@ -18,6 +20,8 @@ from nba_data import (
     get_injury_context,
     get_nba_game_time,
 )
+
+from mlb_data import router as mlb_router
 
 load_dotenv()
 
@@ -31,6 +35,7 @@ load_dotenv()
 
 app = FastAPI(title="ODDSFORGE MVP")
 app.include_router(nba_router)
+app.include_router(mlb_router)
 
 SIMULATIONS = 50_000
 DEFAULT_BANKROLL = 1000
@@ -1299,7 +1304,8 @@ async def live_game_monitor():
                     team_a_b2b=g.get("team_a_b2b", False),
                     team_b_b2b=g.get("team_b_b2b", False),
                 )
-
+    
+    
                 await anyio.to_thread.run_sync(run_simulation, req)
 
         except Exception as e:
