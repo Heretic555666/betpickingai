@@ -11,6 +11,8 @@ ENABLE_MLB = os.getenv("ENABLE_MLB", "false").lower() == "true"
 
 from dotenv import load_dotenv
 
+load_dotenv()
+
 from nba_data import (
     fetch_nba_totals_odds,
     build_model_inputs,
@@ -23,7 +25,7 @@ from nba_data import (
 
 from mlb_data import router as mlb_router
 
-load_dotenv()
+
 
 last_heartbeat_date = None
 
@@ -1278,8 +1280,72 @@ async def daily_auto_run():
 
 
                     print("✅ Auto-run game complete:", result)
+                
+                from nrl_afl_edges import get_edges
 
-            
+                # =====================
+                # NRL EDGE ALERTS
+                # =====================
+                nrl_edges = get_edges("rugbyleague_nrl", "NRL")
+
+                for edge in nrl_edges:
+                    if edge["confidence"] < 0.75:
+                        continue
+
+                    send_telegram_alert(
+                        f"🏉 NRL EDGE\n"
+                        f"{edge['home']} vs {edge['away']}\n"
+                        f"Total: {edge['book_total']}\n"
+                        f"Model: {edge['model_total']}\n"
+                        f"Edge: {edge['edge']}\n"
+                        f"Confidence: {round(edge['confidence']*100)}%"
+                )
+
+                # =====================
+                # AFL EDGE ALERTS
+                # =====================
+                afl_edges = get_edges("aussierules_afl", "AFL")
+
+                for edge in afl_edges:
+                    if edge["confidence"] < 0.75:
+                        continue
+
+                    send_telegram_alert(
+                        f"🏉 AFL EDGE\n"
+                        f"{edge['home']} vs {edge['away']}\n"
+                        f"Total: {edge['book_total']}\n"
+                        f"Model: {edge['model_total']}\n"
+                        f"Edge: {edge['edge']}\n"
+                        f"Confidence: {round(edge['confidence']*100)}%"
+                )
+
+                # =========================
+                # NRL DAILY ALERTS
+                # =========================
+                from odds_data import fetch_odds_for_sport
+
+                nrl_games = fetch_odds_for_sport("rugbyleague_nrl")
+
+                for game in nrl_games or []:
+                    send_telegram_alert(
+                        f"🏉 NRL DAILY ALERT\n"
+                        f"{game['home_team']} vs {game['away_team']}\n"
+                        f"Start: {game['commence_time']}"
+                    )
+
+                # =========================
+                # AFL DAILY ALERTS
+                # =========================
+
+                afl_games = fetch_odds_for_sport("aussierules_afl")
+
+                for game in afl_games or []:
+                    send_telegram_alert(
+                        f"🏉 AFL DAILY ALERT\n"
+                        f"{game['home_team']} vs {game['away_team']}\n"
+                        f"Start: {game['commence_time']}"
+                    )
+        
                 last_run_date = now.date()
                 print("✅ Daily auto-run complete")
             except Exception as e:
@@ -1289,7 +1355,10 @@ async def daily_auto_run():
 
 async def live_game_monitor():
     print("📡 Live game monitor active")
+    
+    from odds_data import fetch_odds_for_sport
 
+   
     while True:
         try:
             games = build_model_inputs()
@@ -1305,6 +1374,7 @@ async def live_game_monitor():
                     team_b_b2b=g.get("team_b_b2b", False),
                 )
     
+            
     
                 await anyio.to_thread.run_sync(run_simulation, req)
 
@@ -1332,6 +1402,21 @@ async def startup():
 def test_telegram():
     send_telegram_alert("✅ Telegram test successful")
     return {"ok": True}
+
+# =========================================================
+# TEST ODDS FETCH (SAFE — NO ALERTS)
+# =========================================================
+
+from odds_data import fetch_odds_for_sport
+
+@app.get("/test-odds/{sport_key}")
+def test_odds(sport_key: str):
+    games = fetch_odds_for_sport(sport_key)
+    return {
+        "sport": sport_key,
+        "games_found": len(games),
+        "sample": games[:2]
+    }
 
 @app.get("/health")
 def health_check():

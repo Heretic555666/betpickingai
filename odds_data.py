@@ -3,21 +3,35 @@ import os
 
 ODDS_API_KEY = os.getenv("ODDS_API_KEY")
 
+print("KEY LOADED:", ODDS_API_KEY)
+
 SPORT_KEY = "basketball_nba"
-REGIONS = "us"
-MARKETS = "spreads,totals"
+MLB_SPORT = "baseball_mlb"
+NRL_SPORT_KEY = "rugbyleague_nrl"
+AFL_SPORT_KEY = "aussierules_afl"
+DEFAULT_REGIONS = "us"
+
+SPORT_REGIONS = {
+    "rugbyleague_nrl": "au",
+    "aussierules_afl": "au",
+}
+
+MARKETS = "spreads,h2h"
 ODDS_FORMAT = "decimal"
 
 
 def fetch_nba_totals():
     url = f"https://api.the-odds-api.com/v4/sports/{SPORT_KEY}/odds"
 
+    region = DEFAULT_REGIONS
+
     params = {
         "apiKey": ODDS_API_KEY,
-        "regions": REGIONS,
+        "regions": region,
         "markets": MARKETS,
         "oddsFormat": ODDS_FORMAT,
     }
+
 
     res = requests.get(url, params=params, timeout=10)
     res.raise_for_status()
@@ -49,7 +63,7 @@ def get_mlb_totals(api_key: str):
 
     params = {
         "apiKey": api_key,
-        "regions": "us",
+        "regions": "region",
         "markets": "totals",
         "oddsFormat": "decimal",
     }
@@ -77,3 +91,23 @@ def get_mlb_totals(api_key: str):
                             })
 
     return results
+
+def fetch_odds_for_sport(sport_key: str):
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
+
+    region = SPORT_REGIONS.get(sport_key, DEFAULT_REGIONS)
+
+    params = {
+        "apiKey": ODDS_API_KEY,
+        "regions": region,
+        "markets": MARKETS,
+        "oddsFormat": ODDS_FORMAT,
+    }
+
+    try:
+        res = requests.get(url, params=params, timeout=10)
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        print(f"Odds fetch failed for {sport_key}:", e)
+        return []
