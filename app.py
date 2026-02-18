@@ -914,6 +914,15 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
                     f"🏆 Tier: {tier}\n\n"
                     "⚠️ Daily scan only — wait for pregame confirmation."
                 )
+
+                # Append MLB Run Line value if present
+                if isinstance(edge, dict) and "run_line_pick" in edge:
+                    daily_message += (
+                        f"\n⚾ Run Line Value\n"
+                        f"Pick: {edge['run_line_pick']}\n"
+                        f"Edge: {round(edge['run_line_edge']*100,1)}%\n"
+                )
+
             
             # OPTIONAL: include injury names in daily alerts (OFF by default)
             if os.getenv("SHOW_INJURIES_IN_DAILY") == "true":

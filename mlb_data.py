@@ -10,7 +10,9 @@ from mlb_model import (
     project_team_runs,
     simulate_mlb_game,
     project_f5_runs,
+    simulate_run_line,
 )
+
 
 def normalize_team(name: str) -> str:
     """Normalize team names for matching."""
@@ -45,11 +47,34 @@ def mlb_edges():
         edge = round(model_total - book_total, 2)
         
         confidence = min(abs(edge) * 0.12, 1.0)
+        
+                # --- RUN LINE SIMULATION ---
+        rl = simulate_run_line(home_proj, away_proj)
+
+        home_cover_prob = rl["home_cover_prob"]
+        away_cover_prob = rl["away_cover_prob"]
+
+        # implied probability from -110 style pricing assumption
+        implied = 0.523
+
+        home_edge = round(home_cover_prob - implied, 3)
+        away_edge = round(away_cover_prob - implied, 3)
 
         # --- F5 CALCULATION ---
         home_f5 = project_f5_runs(home_proj)
         away_f5 = project_f5_runs(away_proj)
         f5_total = round(home_f5 + away_f5, 2)
+
+        # Determine strongest run-line edge
+        rl_side = None
+        rl_edge = 0
+
+        if abs(home_edge) > abs(away_edge):
+            rl_side = f"{home} -1.5"
+            rl_edge = home_edge
+        else:
+            rl_side = f"{away} +1.5"
+            rl_edge = away_edge
 
         results.append({
             "home": home,
@@ -59,13 +84,34 @@ def mlb_edges():
             "edge": edge,
             "confidence": confidence,
             "f5_total": f5_total,
+            "run_line_home_edge": home_edge,
+            "run_line_away_edge": away_edge,
+            "home_cover_prob": round(home_cover_prob, 3),
+            "away_cover_prob": round(away_cover_prob, 3),
         })
 
+
     # Elite alerts only (80%+)
-    elite_results = [r for r in results if r["confidence"] >= 0.80]
+    elite_results = [
+        r for r in results
+        if r["confidence"] >= 0.80
+        or abs(r["run_line_home_edge"]) >= 0.08
+        or abs(r["run_line_away_edge"]) >= 0.08
+    ]
+
+    # Build readable run-line output fields
+    for r in elite_results:
+        rl_home = r["run_line_home_edge"]
+        rl_away = r["run_line_away_edge"]
+
+        if abs(rl_home) > abs(rl_away):
+            r["run_line_pick"] = f"{r['home']} -1.5"
+            r["run_line_edge"] = rl_home
+        else:
+            r["run_line_pick"] = f"{r['away']} +1.5"
+            r["run_line_edge"] = rl_away
 
     return elite_results
-
 
 @router.get("/mlb/test")
 def mlb_test():

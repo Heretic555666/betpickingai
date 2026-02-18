@@ -64,7 +64,7 @@ def get_mlb_totals(api_key: str):
     params = {
         "apiKey": api_key,
         "regions": "region",
-        "markets": "totals",
+        "markets": "totals,spreads",
         "oddsFormat": "decimal",
     }
 
@@ -87,6 +87,16 @@ def get_mlb_totals(api_key: str):
                                 "home": home,
                                 "away": away,
                                 "total": outcome["point"],
+                                "book": book["title"]
+                            })
+                if market["key"] == "spreads":
+                    for outcome in market["outcomes"]:
+                        if outcome["point"] == -1.5:
+                            results.append({
+                                "home": home,
+                                "away": away,
+                                "run_line": outcome["point"],
+                                "run_line_price": outcome["price"],
                                 "book": book["title"]
                             })
 

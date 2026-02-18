@@ -44,7 +44,27 @@ def simulate_mlb_game(home_proj, away_proj, sims=50000):
         "home_win_prob": float(np.mean(home_runs > away_runs)),
         "over_dist": totals.tolist()[:1000],  # small sample
     }
-    
+
+def simulate_run_line(home_proj, away_proj, sims=50000):
+    """
+    Simulate MLB run-line outcomes (±1.5).
+    """
+    rng = np.random.default_rng()
+
+    home_runs = rng.poisson(home_proj, sims)
+    away_runs = rng.poisson(away_proj, sims)
+
+    margins = home_runs - away_runs
+
+    home_cover = np.mean(margins > 1.5)
+    away_cover = np.mean(margins < -1.5)
+
+    return {
+        "home_cover_prob": float(home_cover),
+        "away_cover_prob": float(away_cover),
+        "avg_margin": float(np.mean(margins)),
+    }
+
 def project_f5_runs(team_runs_projection):
     """
     Estimate runs scored in first 5 innings.
