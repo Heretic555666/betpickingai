@@ -89,6 +89,7 @@ def get_mlb_totals(api_key: str):
                                 "total": outcome["point"],
                                 "book": book["title"]
                             })
+                
                 if market["key"] == "spreads":
                     for outcome in market["outcomes"]:
                         if outcome["point"] == -1.5:
@@ -99,6 +100,17 @@ def get_mlb_totals(api_key: str):
                                 "run_line_price": outcome["price"],
                                 "book": book["title"]
                             })
+                if market["key"] == "h2h":
+                    home_price = market["outcomes"][0]["price"]
+                    away_price = market["outcomes"][1]["price"]
+
+                    results.append({
+                        "home": home,
+                        "away": away,
+                        "home_ml": home_price,
+                        "away_ml": away_price,
+                        "book": book["title"]
+                    })
 
     return results
 

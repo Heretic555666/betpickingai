@@ -38,6 +38,8 @@ def mlb_edges():
         home = game["home"]
         away = game["away"]
         book_total = game["total"]
+        home_ml = game.get("home_ml")
+        away_ml = game.get("away_ml")
 
         # --- MODEL PROJECTIONS ---
         home_proj = project_team_runs(home, away, is_home=True)
@@ -48,11 +50,40 @@ def mlb_edges():
         
         confidence = min(abs(edge) * 0.12, 1.0)
         
-                # --- RUN LINE SIMULATION ---
+        # --- RUN LINE SIMULATION ---
         rl = simulate_run_line(home_proj, away_proj)
 
         home_cover_prob = rl["home_cover_prob"]
         away_cover_prob = rl["away_cover_prob"]
+        
+        # --- WIN PROBABILITY SIMULATION ---
+        sim = simulate_mlb_game(home_proj, away_proj)
+        home_win_prob = sim["home_win_prob"]
+        away_win_prob = 1 - home_win_prob
+
+        # --- MONEYLINE EDGE ---
+        ml_pick = None
+        ml_edge = None
+
+        if home_ml and away_ml:
+            implied_home = 1 / home_ml
+            implied_away = 1 / away_ml
+
+            home_edge_ml = home_win_prob - implied_home
+            away_edge_ml = away_win_prob - implied_away
+
+            if abs(home_edge_ml) > abs(away_edge_ml):
+                ml_pick = home
+                ml_edge = round(home_edge_ml, 3)
+            else:
+                ml_pick = away
+                ml_edge = round(away_edge_ml, 3)
+        # --- RUN DIFFERENTIAL EDGE ---
+        avg_margin = rl["avg_margin"]
+        spread_edge = round(avg_margin - 1.5, 2)
+
+        home_win_prob = sim["home_win_prob"]
+        away_win_prob = 1 - home_win_prob
 
         # implied probability from -110 style pricing assumption
         implied = 0.523
@@ -88,6 +119,9 @@ def mlb_edges():
             "run_line_away_edge": away_edge,
             "home_cover_prob": round(home_cover_prob, 3),
             "away_cover_prob": round(away_cover_prob, 3),
+            "ml_pick": ml_pick,
+            "ml_edge": ml_edge,
+            "spread_edge": spread_edge,
         })
 
 
@@ -97,7 +131,10 @@ def mlb_edges():
         if r["confidence"] >= 0.80
         or abs(r["run_line_home_edge"]) >= 0.08
         or abs(r["run_line_away_edge"]) >= 0.08
+        or (r["ml_edge"] and abs(r["ml_edge"]) >= 0.05)
+        or abs(r["spread_edge"]) >= 1.2
     ]
+
 
     # Build readable run-line output fields
     for r in elite_results:
