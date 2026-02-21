@@ -24,6 +24,7 @@ from nba_data import (
 )
 
 from mlb_data import router as mlb_router
+from nrl_afl_edges import get_edges
 
 
 
@@ -134,6 +135,17 @@ PREGAME_ALERTS: dict = {}
 DAILY_SENT_ALERTS: set[str] = set()
 
 ALERT_DAY = datetime.now(timezone.utc).date()
+
+def starts_within_30_minutes(commence_time):
+    """
+    True if game starts within next 30 minutes.
+    """
+    try:
+        start = datetime.fromisoformat(commence_time.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        return timedelta(minutes=0) <= (start - now) <= timedelta(minutes=30)
+    except Exception:
+        return False
 
 
 def reset_alerts_if_new_day():
@@ -928,7 +940,7 @@ def run_simulation(req: SimulationRequest, *, ignore_time_window: bool = False):
             if os.getenv("SHOW_INJURIES_IN_DAILY") == "true":
                 daily_message += f"\n🏥 Injury Report\n{injury_report_text}\n"
 
-                send_telegram_alert(daily_message)
+            send_telegram_alert(daily_message)
 
         # -------------------------
         # TRAP WARNING REASON
@@ -1298,9 +1310,7 @@ async def daily_auto_run():
                 nrl_edges = get_edges("rugbyleague_nrl", "NRL")
 
                 for edge in nrl_edges:
-                    if edge["confidence"] < 0.75:
-                        continue
-
+                    
                     send_telegram_alert(
                         f"🏉 NRL EDGE\n"
                         f"{edge['home']} vs {edge['away']}\n"
@@ -1316,9 +1326,7 @@ async def daily_auto_run():
                 afl_edges = get_edges("aussierules_afl", "AFL")
 
                 for edge in afl_edges:
-                    if edge["confidence"] < 0.75:
-                        continue
-
+                    
                     send_telegram_alert(
                         f"🏉 AFL EDGE\n"
                         f"{edge['home']} vs {edge['away']}\n"
@@ -1342,6 +1350,43 @@ async def daily_auto_run():
                         f"Start: {game['commence_time']}"
                     )
 
+                from nrl_afl_edges import get_edges
+
+                edges = get_edges("rugbyleague_nrl", "NRL")
+
+                for edge in edges:
+                    message = (
+                        f"🏉 BEST PLAY\n"
+                        f"{edge['home']} vs {edge['away']}\n"
+                        f"Pick: {edge['best_pick']}\n"
+                        f"Edge: {edge['best_edge']}\n"
+                    )
+
+                    if edge.get("elite_play"):
+                        message += "🔥 ELITE PLAY\n"
+
+                    send_telegram_alert(message)
+                
+                # ⏰ 30 MINUTE KICKOFF CHECK (NRL)
+                for game in nrl_games:
+                    if starts_within_30_minutes(game["commence_time"]):
+
+                        edges = get_edges("rugbyleague_nrl", "NRL")
+
+                        for edge in edges:
+                            message = (
+                                f"⏰ KICKOFF EDGE CHECK\n"
+                                f"{edge['home']} vs {edge['away']}\n"
+                                f"Pick: {edge['best_pick']}\n"
+                                f"Edge: {edge['best_edge']}\n"
+                            )
+
+                            if edge.get("elite_play"):
+                                message += "🔥 ELITE PLAY\n"
+
+                            send_telegram_alert(message)
+                              
+                
                 # =========================
                 # AFL DAILY ALERTS
                 # =========================
@@ -1354,7 +1399,42 @@ async def daily_auto_run():
                         f"{game['home_team']} vs {game['away_team']}\n"
                         f"Start: {game['commence_time']}"
                     )
-        
+                edges = get_edges("aussierules_afl", "AFL")
+
+                for edge in edges:
+                    message = (
+                        f"🏉 BEST PLAY\n"
+                        f"{edge['home']} vs {edge['away']}\n"
+                        f"Pick: {edge['best_pick']}\n"
+                        f"Edge: {edge['best_edge']}\n"
+                    )
+
+                    if edge.get("elite_play"):
+                        message += "🔥 ELITE PLAY\n"
+
+                    send_telegram_alert(message)
+                    
+                # ⏰ 30 MINUTE KICKOFF CHECK (AFL)
+                for game in afl_games:
+                    if starts_within_30_minutes(game["commence_time"]):
+
+                        edges = get_edges("aussierules_afl", "AFL")
+
+                        for edge in edges:
+                            message = (
+                                f"⏰ KICKOFF EDGE CHECK\n"
+                                f"{edge['home']} vs {edge['away']}\n"
+                                f"Pick: {edge['best_pick']}\n"
+                                f"Edge: {edge['best_edge']}\n"
+                            )
+
+                            if edge.get("elite_play"):
+                                message += "🔥 ELITE PLAY\n"
+
+                            send_telegram_alert(message)
+
+
+
                 last_run_date = now.date()
                 print("✅ Daily auto-run complete")
             except Exception as e:

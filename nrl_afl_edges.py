@@ -191,7 +191,32 @@ def get_edges(sport_key, sport_name):
             projected_margin = (model_total - book_total) * 0.6
             spread_edge = round(projected_margin - spread_line, 2)
 
-                       
+                    # -------- BEST PLAY SELECTION --------
+        best_pick = None
+        best_edge = 0
+
+        if spread_edge is not None and abs(spread_edge) > abs(best_edge):
+            best_pick = f"{game['home_team']} spread"
+            best_edge = spread_edge
+
+        if ml_edge is not None and abs(ml_edge) > abs(best_edge):
+            best_pick = ml_pick
+            best_edge = ml_edge
+
+        if abs(edge) > abs(best_edge):
+            best_pick = "UNDER" if edge < 0 else "OVER"
+            best_edge = edge
+
+        # -------- ELITE EDGE DETECTION --------
+        elite_play = False
+
+        if abs(edge) >= 5:
+            elite_play = True
+        elif ml_edge and abs(ml_edge) >= 0.08:
+            elite_play = True
+        elif spread_edge and abs(spread_edge) >= 4:
+            elite_play = True
+           
             home_ml_edge = home_win_prob - implied_home
             away_ml_edge = away_win_prob - implied_away
 
@@ -201,6 +226,22 @@ def get_edges(sport_key, sport_name):
             else:
                 ml_pick = game["away_team"]
                 ml_edge = round(away_ml_edge, 3)
+            
+            # -------- BEST PLAY SELECTION --------
+            best_pick = None
+            best_edge = 0
+
+            if spread_edge is not None and abs(spread_edge) > abs(best_edge):
+                best_pick = f"{game['home_team']} spread"
+                best_edge = spread_edge
+
+            if ml_edge is not None and abs(ml_edge) > abs(best_edge):
+                best_pick = ml_pick
+                best_edge = ml_edge
+
+            if abs(edge) > abs(best_edge):
+                best_pick = "UNDER" if edge < 0 else "OVER"
+                best_edge = edge
 
         edges.append({
             "sport": sport_name,
@@ -213,6 +254,9 @@ def get_edges(sport_key, sport_name):
             "ml_pick": ml_pick,
             "ml_edge": ml_edge,
             "spread_edge": spread_edge,
+            "best_pick": best_pick,
+            "best_edge": round(best_edge, 2),
+            "elite_play": elite_play,
         })
 
 
