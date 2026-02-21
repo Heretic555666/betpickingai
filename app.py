@@ -143,7 +143,7 @@ def starts_within_30_minutes(commence_time):
     try:
         start = datetime.fromisoformat(commence_time.replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        return timedelta(minutes=0) <= (start - now) <= timedelta(minutes=30)
+        return timedelta(minutes=0) <= (start - now) <= timedelta(minutes=20)
     except Exception:
         return False
 
