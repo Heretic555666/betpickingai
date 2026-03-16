@@ -26,6 +26,12 @@ from nba_data import (
 from mlb_data import router as mlb_router
 from nrl_afl_edges import get_edges
 
+# =============================
+# ODDS CACHE (API CREDIT SHIELD)
+# =============================
+ODDS_CACHE = {}
+ODDS_CACHE_TIME = {}
+CACHE_SECONDS = 3000
 
 
 last_heartbeat_date = None
@@ -134,7 +140,14 @@ def run_nrl_afl_scan():
 
     for sport_key, sport_name in sports:
 
-        edges = get_edges(sport_key, sport_name)
+        now = datetime.now().timestamp()
+
+        if sport_key in ODDS_CACHE and now - ODDS_CACHE_TIME[sport_key] < CACHE_SECONDS:
+            edges = ODDS_CACHE[sport_key]
+        else:
+            edges = get_edges(sport_key, sport_name)
+            ODDS_CACHE[sport_key] = edges
+            ODDS_CACHE_TIME[sport_key] = now
 
         for e in edges:
 
@@ -1223,7 +1236,7 @@ async def pregame_alert_scheduler():
                 send_telegram_alert("🚨 LATE PREGAME ALERT\n\n" + alert["message"])
                 alert["sent_5"] = True
 
-        run_nrl_afl_scan()
+        # run_nrl_afl_scan()  # disabled to prevent minute scanning
 
         await asyncio.sleep(60)
 
@@ -1270,7 +1283,11 @@ async def daily_auto_run():
 
     while True:
         now = datetime.now(timezone.utc)
-
+        
+        # Only run NRL/AFL picks on Thursday
+        if now.weekday() != 3:
+            await asyncio.sleep(60)
+            continue
         run_hour, run_minute = map(int, AUTO_RUN_TIME.split(":"))
         run_time = now.replace(
             hour=run_hour, minute=run_minute, second=0, microsecond=0
