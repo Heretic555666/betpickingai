@@ -16,7 +16,7 @@ SPORT_REGIONS = {
     "aussierules_afl": "au",
 }
 
-MARKETS = "spreads,h2h"
+MARKETS = "spreads,h2h,totals"
 ODDS_FORMAT = "decimal"
 
 

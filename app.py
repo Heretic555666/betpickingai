@@ -49,7 +49,7 @@ AEST = timezone(timedelta(hours=10))
 # ELITE MODE TOGGLE
 # =========================================================
 
-ELITE_MODE = True   # True = only ELITE alerts
+ELITE_MODE = False   # True = only ELITE alerts
                     # False = allow all normal tiers
 
 # -------------------------
@@ -89,12 +89,13 @@ def send_telegram_alert(
     pace_adjust: float | None = None,
     variance_adjust: float | None = None,
 ):
+
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⚠ Telegram not configured")
         return
 
     # ----------------------------------
-    # FAST / SLOW TAG LOGIC (HERE)
+    # FAST / SLOW TAG LOGIC
     # ----------------------------------
     if pace_adjust is not None:
         if pace_adjust >= 1.0:
@@ -102,7 +103,6 @@ def send_telegram_alert(
         elif pace_adjust <= -1.0:
             message += "\n🐢 SLOW game environment"
 
-    # Optional numeric debug (keep or remove later)
     if pace_adjust is not None or variance_adjust is not None:
         message += (
             f"\n\n⚙ Pace adj: {pace_adjust:+.2f}"
@@ -119,12 +119,34 @@ def send_telegram_alert(
             },
             timeout=5,
         )
+
         print("✅ Telegram sent:", res.status_code)
+
     except Exception as e:
         print("❌ Telegram failed:", e)
 
+def run_nrl_afl_scan():
 
+    sports = [
+        ("rugbyleague_nrl", "NRL"),
+        ("aussierules_afl", "AFL"),
+    ]
 
+    for sport_key, sport_name in sports:
+
+        edges = get_edges(sport_key, sport_name)
+
+        for e in edges:
+
+            message = (
+                f"🏉 {sport_name} EDGE\n"
+                f"{e['home']} vs {e['away']}\n\n"
+                f"🎯 Pick: {e['best_pick']}\n"
+                f"⚡ Edge: {e['best_edge']}\n"
+                f"📊 Confidence: {round(e['confidence']*100)}%"
+            )
+
+            send_telegram_alert(message)
 
 # =========================================================
 # ALERT STATE
@@ -1192,6 +1214,8 @@ async def pregame_alert_scheduler():
                     continue
                 send_telegram_alert("🚨 LATE PREGAME ALERT\n\n" + alert["message"])
                 alert["sent_5"] = True
+
+        run_nrl_afl_scan()
 
         await asyncio.sleep(60)
 
