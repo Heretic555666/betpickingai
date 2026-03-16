@@ -1285,7 +1285,7 @@ async def daily_auto_run():
         now = datetime.now(timezone.utc)
         
         # Only run NRL/AFL picks on Thursday
-        if now.weekday() != 3:
+        if now.weekday() != 2:
             await asyncio.sleep(60)
             continue
         run_hour, run_minute = map(int, AUTO_RUN_TIME.split(":"))
