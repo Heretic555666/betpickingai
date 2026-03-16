@@ -138,6 +138,14 @@ def run_nrl_afl_scan():
 
         for e in edges:
 
+            # --- DEDUPE KEY (1 alert per game + pick) ---
+            key = f"{sport_name}_{e['home']}_{e['away']}_{e['best_pick']}"
+
+            if key in SENT_ALERTS:
+                continue
+
+            SENT_ALERTS.add(key)
+
             message = (
                 f"🏉 {sport_name} EDGE\n"
                 f"{e['home']} vs {e['away']}\n\n"
